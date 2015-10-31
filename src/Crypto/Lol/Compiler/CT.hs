@@ -8,7 +8,7 @@
 -- Some of these nodes require auxillary information (key switch hints)
 -- so a simple compiler is provided in CTCompiler and CTDummy
 
-module AST.CT where
+module Crypto.Lol.Compiler.CT where
 
 import Control.DeepSeq
 

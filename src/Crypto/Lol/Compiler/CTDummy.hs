@@ -10,7 +10,7 @@
 -- The nodes in this module *cannot* be evaluated, 
 -- they must be compiled to CT nodes first.
 
-module AST.CTDummy 
+module Crypto.Lol.Compiler.CTDummy 
 (CTDummyOps(..)
 ,tunnDummy
 ,ksqDummy,

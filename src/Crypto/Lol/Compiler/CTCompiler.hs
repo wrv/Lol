@@ -13,7 +13,7 @@
 -- 3. encryptInput
 -- 4. getDecryptKey
 
-module AST.CTCompiler
+module Crypto.Lol.Compiler.CTCompiler
 (showIDDecor
 ,genKeys
 ,genHints
@@ -28,9 +28,9 @@ import Control.Monad.Random
 import Control.Monad.State
 import Control.Monad.Identity
 
-import AST.AST
-import AST.CT
-import AST.CTDummy
+import Crypto.Lol.Compiler.AST
+import Crypto.Lol.Compiler.CT
+import Crypto.Lol.Compiler.CTDummy
 import Crypto.Lol.Cyclotomic.Cyc
 import Crypto.Lol.Cyclotomic.Linear
 import Crypto.Lol.LatticePrelude hiding (lookup, lift)

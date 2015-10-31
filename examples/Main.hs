@@ -4,10 +4,10 @@
              FlexibleContexts, ScopedTypeVariables, RankNTypes, PolyKinds,
              StandaloneDeriving, DeriveDataTypeable, ConstraintKinds #-}
 
-import AST.AST hiding (Sub)
-import AST.CT
-import AST.CTDummy
-import AST.CTCompiler
+import Crypto.Lol.Compiler.AST hiding (Sub)
+import Crypto.Lol.Compiler.CT
+import Crypto.Lol.Compiler.CTDummy
+import Crypto.Lol.Compiler.CTCompiler
 import Data.Syntactic.Sugar.BindingT () -- need for instance of Syntactic (a->b) when using `share` below
 import Data.Syntactic hiding (size)
 import Data.Syntactic.Functional (lamT, BindingT)

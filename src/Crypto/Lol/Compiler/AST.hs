@@ -5,7 +5,7 @@
 
 -- | This module contains several application-independent AST operations 
 
-module AST.AST 
+module Crypto.Lol.Compiler.AST 
 (eval
 ,Literal(..)
 ,ADDITIVE(..)
