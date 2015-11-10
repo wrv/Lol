@@ -35,23 +35,23 @@ import           Data.Tuple           (swap)
 import qualified Data.Vector          as V
 import qualified Data.Vector.Unboxed  as U
 
--- | Tensor is a container that supports all the core linear
--- transformations needed for cyclotomic ring arithmetic.
+-- | 'Tensor' encapsulates all the core linear transformations needed
+-- for cyclotomic ring arithmetic.
 
 -- | The type @t m r@ represents a cyclotomic coefficient tensor of
--- index @m@ over base ring @r@.  Many of the methods take and/or
--- produce coefficient tensors relative to particular bases, but the
--- tensor itself does not keep track of the corresponding basis.
+-- index @m@ over base ring @r@.  Most of the methods represent linear
+-- transforms corresponding to operations in particular bases.
 -- CRT-related methods are wrapped in 'Maybe' because they are
 -- well-defined only when a CRT basis exists over the ring @r@ for
 -- index @m@.
 
 -- | The superclass constraint is for convenience, to ensure that we
--- can sample error tensors over 'Double'.
+-- can sample error tensors of 'Double's.
 
 class (TElt t Double, TElt t (Complex Double))
       => Tensor (t :: Factored -> * -> *) where
 
+  -- | Constraints needed by @t@ to hold type @r@.
   type TElt t r :: Constraint
 
   -- | Properties that hold for any index. Use with '\\'.
@@ -60,32 +60,39 @@ class (TElt t Double, TElt t (Complex Double))
   
   -- | Properties that hold for any (legal) fully-applied tensor. Use
   -- with '\\'.
-  entailFullT :: Tagged (t m r)
-                 ((Fact m, TElt t r) :- 
-                  (Eq (t m r), ZeroTestable (t m r), Ring (t m r), 
-                   NFData (t m r), Random (t m r)))
+  entailEqT :: Tagged (t m r)
+               ((Eq r, Fact m, TElt t r) :- (Eq (t m r)))
+  entailZTT :: Tagged (t m r)
+               ((ZeroTestable r, Fact m, TElt t r) :- (ZeroTestable (t m r)))
+  entailRingT :: Tagged (t m r)
+                 ((Ring r, Fact m, TElt t r) :- (Ring (t m r)))
+  entailNFDataT :: Tagged (t m r)
+                   ((NFData r, Fact m, TElt t r) :- (NFData (t m r)))
+  entailRandomT :: Tagged (t m r)
+                   ((Random r, Fact m, TElt t r) :- (Random (t m r)))
 
   -- | Converts a scalar to a tensor in the powerful basis
-  scalarPow :: (Fact m, TElt t r) => r -> t m r
+  scalarPow :: (Ring r, Fact m, TElt t r) => r -> t m r
 
-  -- | 'l' converts from decoding basis to powerful basis; 'lInv' is
-  -- its inverse.
-  l, lInv :: (Fact m, TElt t r) => t m r -> t m r
+  -- | 'l' converts from decoding-basis representation to
+  -- powerful-basis representation; 'lInv' is its inverse.
+  l, lInv :: (Ring r, Fact m, TElt t r) => t m r -> t m r
 
   -- | Multiply by @g@ in the powerful/decoding basis
-  mulGPow, mulGDec :: (Fact m, TElt t r) => t m r -> t m r
+  mulGPow, mulGDec :: (Ring r, Fact m, TElt t r) => t m r -> t m r
 
   -- | Divide by @g@ in the powerful/decoding basis.  The 'Maybe'
   -- output indicates that the operation may fail, which happens
   -- exactly when the input is not divisible by @g@.
-  divGPow, divGDec :: (Fact m, TElt t r) => t m r -> Maybe (t m r)
+  divGPow, divGDec :: (ZeroTestable r, IntegralDomain r, Fact m, TElt t r)
+                      => t m r -> Maybe (t m r)
 
   -- | A tuple of all the operations relating to the CRT basis, in a
   -- single 'Maybe' value for safety.  Clients should typically not
   -- use this method directly, but instead call the corresponding
   -- top-level functions: the elements of the tuple correpond to the
-  -- functions 'mulGCRT', 'divGCRT', 'crt', 'crtInv'.
-  crtFuncs :: (Fact m, TElt t r, CRTrans r) =>
+  -- functions 'scalarCRT', 'mulGCRT', 'divGCRT', 'crt', 'crtInv'.
+  crtFuncs :: (ZeroTestable r, IntegralDomain r, CRTrans r, Fact m, TElt t r) =>
               Maybe (    r -> t m r, -- scalarCRT
                      t m r -> t m r, -- mulGCRT
                      t m r -> t m r, -- divGCRT
@@ -94,17 +101,17 @@ class (TElt t Double, TElt t (Complex Double))
 
   -- | Sample from the "skewed" Gaussian error distribution @t*D@
   -- in the decoding basis, where @D@ has scaled variance @v@.
-  tGaussianDec :: (Fact m, OrdFloat q, Random q, TElt t q,
-                   ToRational v, MonadRandom rnd)
+  tGaussianDec :: (OrdFloat q, Random q, TElt t q,
+                   ToRational v, Fact m, MonadRandom rnd)
                   => v -> rnd (t m q)
 
   -- | The @twace@ linear transformation, which is the same in both the
   -- powerful and decoding bases.
-  twacePowDec :: (m `Divides` m', TElt t r) => t m' r -> t m r
+  twacePowDec :: (Ring r, m `Divides` m', TElt t r) => t m' r -> t m r
 
   -- | The @embed@ linear transformations, for the powerful and
   -- decoding bases.
-  embedPow, embedDec :: (m `Divides` m', TElt t r)
+  embedPow, embedDec :: (Ring r, m `Divides` m', TElt t r)
                         => t m r -> t m' r
 
   -- | A tuple of all the extension-related operations involving the
@@ -112,21 +119,22 @@ class (TElt t Double, TElt t (Complex Double))
   -- method directly, but instead call the corresponding top-level
   -- functions: the elements of the tuple correpond to the functions
   -- 'twaceCRT', 'embedCRT'.
-  crtExtFuncs :: (m `Divides` m', TElt t r, CRTrans r) =>
+  crtExtFuncs :: (ZeroTestable r, IntegralDomain r, CRTrans r,
+                  m `Divides` m', TElt t r) =>
                  Maybe (t m' r -> t m  r, -- twaceCRT
                         t m  r -> t m' r) -- embedCRT
 
-  -- | Map a tensor in the powerful/decoding/CRT basis, representing
+  -- | Map a tensor in the powerful\/decoding\/CRT basis, representing
   -- an @O_m'@ element, to a vector of tensors representing @O_m@
   -- elements in the same kind of basis.
-  coeffs :: (m `Divides` m', TElt t r) => t m' r -> [t m r]
+  coeffs :: (Ring r, m `Divides` m', TElt t r) => t m' r -> [t m r]
 
   -- | The powerful extension basis w.r.t. the powerful basis.
-  powBasisPow :: (m `Divides` m', TElt t r) => Tagged m [t m' r]
+  powBasisPow :: (Ring r, TElt t r, m `Divides` m') => Tagged m [t m' r]
 
   -- | A list of tensors representing the mod-@p@ CRT set of the
   -- extension.
-  crtSetDec :: (m `Divides` m', PrimeField fp,
+  crtSetDec :: (PrimeField fp, m `Divides` m',
                 Coprime (PToF (CharOf fp)) m', TElt t fp)
                => Tagged m [t m' fp]
 
@@ -137,8 +145,9 @@ class (TElt t Double, TElt t (Complex Double))
   fmapTM :: (Monad mon, Fact m, TElt t a, TElt t b)
              => (a -> mon b) -> t m a -> mon (t m b)
 
--- | Convenience value indicating whether crtFuncs exists.
-hasCRTFuncs :: forall t m r . (Tensor t, Fact m, TElt t r, CRTrans r)
+-- | Convenience value indicating whether 'crtFuncs' exists.
+hasCRTFuncs :: forall t m r . (ZeroTestable r, IntegralDomain r, CRTrans r, 
+                               Tensor t, Fact m, TElt t r)
                => TaggedT (t m r) Maybe ()
 hasCRTFuncs = tagT $ do
   (_ :: r -> t m r,_,_,_,_) <- crtFuncs
@@ -146,11 +155,13 @@ hasCRTFuncs = tagT $ do
 
 -- | Yield a tensor for a scalar in the CRT basis.  (This function is
 -- simply an appropriate entry from 'crtFuncs'.)
-scalarCRT :: (Tensor t, Fact m, TElt t r, CRTrans r) => Maybe (r -> t m r)
+scalarCRT :: (ZeroTestable r, IntegralDomain r, CRTrans r, 
+              Tensor t, Fact m, TElt t r) => Maybe (r -> t m r)
 scalarCRT = (\(f,_,_,_,_) -> f) <$> crtFuncs
 
 
-mulGCRT, divGCRT, crt, crtInv :: (Tensor t, Fact m, TElt t r, CRTrans r)
+mulGCRT, divGCRT, crt, crtInv ::
+  (ZeroTestable r, IntegralDomain r, CRTrans r, Tensor t, Fact m, TElt t r)
   => Maybe (t m r -> t m r)
 -- | Multiply by @g@ in the CRT basis. (This function is simply an
 -- appropriate entry from 'crtFuncs'.)
@@ -169,17 +180,18 @@ crtInv = (\(_,_,_,_,f) -> f) <$> crtFuncs
 -- For cyclotomic indices m | m',
 -- @Tw(x) = (mhat\/m\'hat) * Tr(g\'\/g * x)@.
 -- (This function is simply an appropriate entry from 'crtExtFuncs'.)
-twaceCRT :: forall t r m m' . (Tensor t, m `Divides` m', TElt t r, CRTrans r)
+twaceCRT :: forall t r m m' . (ZeroTestable r, IntegralDomain r, CRTrans r, 
+                               Tensor t, m `Divides` m', TElt t r)
             => Maybe (t m' r -> t m r)
 twaceCRT = proxyT hasCRTFuncs (Proxy::Proxy (t m' r)) *>
            proxyT hasCRTFuncs (Proxy::Proxy (t m  r)) *>
            (fst <$> crtExtFuncs)
 
-
 -- | Embed a tensor with index @m@ in the CRT basis to a tensor with
 -- index @m'@ in the CRT basis.
 -- (This function is simply an appropriate entry from 'crtExtFuncs'.)
-embedCRT :: forall t r m m' . (Tensor t, m `Divides` m', TElt t r, CRTrans r)
+embedCRT :: forall t r m m' . (ZeroTestable r, IntegralDomain r, CRTrans r, 
+                               Tensor t, m `Divides` m', TElt t r)
             => Maybe (t m r -> t m' r)
 embedCRT = proxyT hasCRTFuncs (Proxy::Proxy (t m' r)) *>
            proxyT hasCRTFuncs (Proxy::Proxy (t m  r)) *>
@@ -214,11 +226,11 @@ indexM (MKron m (MC mc r c)) i j =
       (jq,jr) = j `divMod` c
       in indexM m iq jq * mc ir jr
 
--- | The "tweaked" CRT^* matrix: @CRT^* . diag(sigma(g_m))@
+-- | The "tweaked" CRT^* matrix: @CRT^* . diag(sigma(g_m))@.
 twCRTs :: (Fact m, CRTrans r) => TaggedT m Maybe (Matrix r)
 twCRTs = fMatrix twCRTsPPow
 
--- | The "tweaked" CRT^* matrix (for prime powers): @CRT^* * diag(sigma(g_p))@
+-- | The "tweaked" CRT^* matrix (for prime powers): @CRT^* * diag(sigma(g_p))@.
 twCRTsPPow :: (PPow pp, CRTrans r) => TaggedT pp Maybe (MatrixC r)
 twCRTsPPow = do
   phi    <- pureT totientPPow
@@ -232,7 +244,7 @@ twCRTsPPow = do
 
 -- Reindexing functions
 
--- | Base-p digit reversal; input and output are in @[0,p^e)@.
+-- | Base-p digit reversal; input and output are in @[p^e]@.
 digitRev :: PP -> Int -> Int
 digitRev (_,0) 0 = 0
 -- CJP: use accumulator to avoid multiple exponentiations?
@@ -249,7 +261,7 @@ zmsToIndexFact :: Fact m => Tagged m (Int -> Int)
 zmsToIndexFact = zmsToIndex <$> ppsFact
 
 -- | For a prime power @p^e@, map a tensor index to the corresponding
--- power j in @[phi(p^e)]@, as in the powerful basis
+-- power j in @[phi(p^e)]@, as in the powerful basis.
 indexToPow :: PP -> Int -> Int
 -- CJP: use accumulator to avoid multiple exponentiations?
 indexToPow (p,e) j = let (jq,jr) = j `divMod` (p-1)
@@ -261,7 +273,7 @@ indexToZms :: PP -> Int -> Int
 indexToZms (p,_) i = let (i1,i0) = i `divMod` (p-1)
                        in p*i1 + i0 + 1 
 
--- | Convert a Z_m^* index to a linear tensor index
+-- | Convert a Z_m^* index to a linear tensor index.
 zmsToIndex :: [PP] -> Int -> Int
 zmsToIndex [] _ = 0
 zmsToIndex (pp:rest) i = zmsToIndexPP pp (i `mod` valuePP pp)
@@ -274,11 +286,11 @@ zmsToIndexPP (p,_) i = let (i1,i0) = i `divMod` p
 
 -- Index correspondences for ring extensions
 
--- | Implements correspondences between the linear indexes into bases
--- of O_m', and pair indices into (extension basis) \otimes (basis of
--- O_m).  Works the same for Pow,Dec,CRT bases because they all have
--- that kind of factorization.  The first argument is the list of
--- (phi,phi') pairs for the (merged) prime powers of m,m'.
+-- | Correspondences between the linear indexes into a basis of O_m',
+-- and pair indices into (extension basis) \otimes (basis of O_m).
+-- The work the same for Pow,Dec,CRT bases because all these bases
+-- have that factorization.  The first argument is the list of
+-- @(phi(m),phi(m'))@ pairs for the (merged) prime powers of @m@,@m'@.
 toIndexPair :: [(Int,Int)] -> Int -> (Int,Int)
 fromIndexPair :: [(Int,Int)] -> (Int,Int) -> Int
 
@@ -296,11 +308,12 @@ fromIndexPair ((phi,phi'):rest) (i1,i0) =
       i = fromIndexPair rest (i1q,i0q)
   in (i0r + i1r*phi) + i*phi'
 
--- | A collection of information useful for working with tensor extensions,
--- tagged by @m | m'@.
--- The first component is a list of triples @(p,e,e')@ where @p^e | m@ and @p^e' | m'@.
--- The next two components are @phi(m)@ and @phi(m')@.
--- The final component is a pair for each triple in the first component @(tot(p^e), tot(p^e'))@.
+-- | A collection of useful information for working with tensor
+-- extensions.  The first component is a list of triples @(p,e,e')@
+-- where @e@, @e'@ are respectively the exponents of prime @p@ in @m@,
+-- @m'@.  The next two components are @phi(m)@ and @phi(m')@.  The
+-- final component is a pair @(phi(p^e), phi(p^e'))@ for each triple
+-- in the first component.
 indexInfo :: forall m m' . (m `Divides` m')
              => Tagged '(m, m') ([(Int,Int,Int)], Int, Int, [(Int,Int)])
 indexInfo = let pps = proxy ppsFact (Proxy::Proxy m)
@@ -311,19 +324,18 @@ indexInfo = let pps = proxy ppsFact (Proxy::Proxy m)
                 tots = totients mpps
             in tag (mpps, phi, phi', tots)
 
--- | The vector is made up of @phi(m)@ blocks of @phi(m')/phi(m)@
--- consecutive entries. Each block constains all those indices into
--- the Pow (Dec) basis of @O_m'@ that "lie above" the corresponding index into
--- the Pow (Dec) basis of @O_m@.
+-- | A vector of @phi(m)@ entries, where the @i@th entry is the index
+-- into the powerful\/decoding basis of @O_m'@ of the
+-- @i@th entry of the powerful\/decoding basis of @O_m@.
 extIndicesPowDec :: (m `Divides` m') => Tagged '(m, m') (U.Vector Int)
 extIndicesPowDec = do
   (_, phi, _, tots) <- indexInfo
   return $ U.generate phi (fromIndexPair tots . (0,))
 
--- | The vector is made up of @phi(m)@ blocks of @phi(m')/phi(m)@
--- consecutive entries. Each block constains all those indices into
--- the CRT basis of @O_m'@ that "lie above" the corresponding index into
--- the CRT basis of @O_m@.
+-- | A vector of @phi(m)@ blocks of @phi(m')\/phi(m)@ consecutive
+-- entries. Each block contains all those indices into the CRT basis
+-- of @O_m'@ that "lie above" the corresponding index into the CRT
+-- basis of @O_m@.
 extIndicesCRT :: forall m m' . (m `Divides` m')
                  => Tagged '(m, m') (U.Vector Int)
 extIndicesCRT = do
@@ -338,10 +350,10 @@ baseWrapper f = do
   (mpps, _, phi', _) <- indexInfo
   return $ U.generate phi' (f mpps)
 
--- | A lookup table for 'toIndexPair' applied to indices @[phi(m')]@
+-- | A lookup table for 'toIndexPair' applied to indices @[phi(m')]@.
 baseIndicesPow :: forall m m' . (m `Divides` m')
                   => Tagged '(m, m') (U.Vector (Int,Int))
--- | A lookup table for 'baseIndexDec' applied to indices @[phi(m')]@
+-- | A lookup table for 'baseIndexDec' applied to indices @[phi(m')]@.
 baseIndicesDec :: forall m m' . (m `Divides` m')
                   => Tagged '(m, m') (U.Vector (Maybe (Int,Bool)))
 
@@ -359,14 +371,7 @@ baseIndicesCRT =
   baseWrapper (\pps -> snd . toIndexPair (totients pps))
 
 
-
--- | Used for extracting coefficients in a relative pow\/dec\/crt basis
--- Returns a vector of @phi(m')/phi(m)@, each of dimension @phi(m)@
--- where the @i@^th vector contains the indices into the source vector
--- corresponding to the @Z@-coefficients of the @i@^th @R@-coefficient for
--- the relative basis.
--- See section "Two Index Transforms" and "Coefficients in Relative Bases"
--- from the corresponding paper.
+-- | The @i0@th entry of the @i1@th vector is 'fromIndexPair' @(i1,i0)@.
 extIndicesCoeffs :: forall m m' . (m `Divides` m')
                     => Tagged '(m, m') (V.Vector (U.Vector Int))
 extIndicesCoeffs = do

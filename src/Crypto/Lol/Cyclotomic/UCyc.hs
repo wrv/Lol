@@ -4,21 +4,43 @@
              RankNTypes, RebindableSyntax, ScopedTypeVariables,
              TypeFamilies, TypeOperators, UndecidableInstances #-}
 
--- | 'UCyc' represents a cyclotomic ring of given index over a given
--- base ring.  It transparently handles all necessary conversions
--- between internal representations to support fast ring operations,
--- and efficiently stores and operates upon elements that are known to
+-- | An implementation of cyclotomic rings.  WARNING: this module
+-- provides an experts-only, "unsafe" interface that may result in
+-- runtime errors if not used correctly!
+-- 'Crypto.Lol.Cyclotomic.Cyc.Cyc' provides a safe interface, and
+-- should be used in applications whenever possible.
+--
+-- 'UCyc' transparently handles all necessary conversions between
+-- internal representations to support fast ring operations, and
+-- efficiently stores and operates upon elements that are known to
 -- reside in subrings.
+--
+-- The 'Functor', 'Applicative', 'Foldable', and 'Traversable'
+-- instances of 'UCyc', as well as the 'fmapC' and 'fmapCM' functions,
+-- work over the element's /current/ @r@-basis representation (or
+-- 'pure' scalar representation as a special case, to satisfy the
+-- 'Applicative' laws), and the output remains in that representation.
+-- If the input's representation is not one of these, the behavior is
+-- a runtime error.  To ensure a valid representation when using the
+-- methods from these classes, first call 'forceBasis' or one of its
+-- specializations ('forcePow', 'forceDec', 'forceAny').
 
 module Crypto.Lol.Cyclotomic.UCyc
-( UCyc, CElt
+(
+-- * Data type
+  UCyc, CElt, RElt
+-- * Basic operations
 , mulG, divG
-, tGaussian, errorRounded, errorCoset
-, embed, twace, coeffsCyc, powBasis, crtSet
+, scalarCyc, liftCyc
 , adviseCRT
-, liftCyc, scalarCyc
-, fmapC, fmapCM
+-- * Error sampling
+, tGaussian, errorRounded, errorCoset
+-- * Sub/extension rings
+, embed, twace, coeffsCyc, powBasis, crtSet
+-- * Representations
 , forceBasis, forcePow, forceDec, forceAny
+-- * Specialized maps
+, fmapC, fmapCM
 , U.Basis(..), U.RescaleCyc
 ) where
 
@@ -26,7 +48,7 @@ import           Crypto.Lol.CRTrans
 import           Crypto.Lol.Cyclotomic.Tensor  as T
 import qualified Crypto.Lol.Cyclotomic.Utility as U
 import           Crypto.Lol.Gadget
-import           Crypto.Lol.LatticePrelude     as LP
+import           Crypto.Lol.LatticePrelude     as LP hiding ((*>))
 import           Crypto.Lol.Types.FiniteField
 import           Crypto.Lol.Types.ZPP
 
@@ -34,7 +56,7 @@ import Algebra.Additive     as Additive (C)
 import Algebra.Ring         as Ring (C)
 import Algebra.ZeroTestable as ZeroTestable (C)
 
-import Control.Applicative    hiding ((*>))
+import Control.Applicative
 import Control.DeepSeq
 import Control.Monad.Identity
 import Control.Monad.Random
@@ -45,7 +67,7 @@ import Data.Traversable
 import Data.Typeable
 import Test.QuickCheck
 
-import qualified Debug.Trace as DT
+--import qualified Debug.Trace as DT
 
 -- | A data type for representing cyclotomic rings such as @Z[zeta]@,
 -- @Zq[zeta]@, and @Q(zeta)@: @t@ is the 'Tensor' type for storing
@@ -55,7 +77,7 @@ data UCyc t (m :: Factored) r where
   Pow  :: !(t m r) -> UCyc t m r -- representation wrt powerful basis
   Dec  :: !(t m r) -> UCyc t m r -- decoding basis
 
-  -- Invariant: use CRTr if and only if crtFuncs exists for (t m r);
+  -- Invariant: use CRTr iff crtFuncs exists for (t m r);
   -- otherwise use CRTe (because crtFuncs is guaranteed to exist for
   -- (t m (CRTExt r))
   CRTr :: !(t m r) -> UCyc t m r -- wrt CRT basis over r, if it exists
@@ -74,15 +96,17 @@ data UCyc t (m :: Factored) r where
 
 -- | Shorthand for frequently reused constraints that are needed for
 --  change of basis.
-type UCCtx t r = (Tensor t, CRTrans r, CRTrans (CRTExt r), CRTEmbed r,
-                  ZeroTestable r, TElt t r, TElt t (CRTExt r))
+type UCCtx t r = (Tensor t, RElt t r, RElt t (CRTExt r), CRTEmbed r)
+
+-- | Collection of constraints need to work on most functions over a
+-- particular base ring @r@.
+type RElt t r = (TElt t r, CRTrans r, IntegralDomain r, ZeroTestable r, NFData r)
 
 -- | Shorthand for frequently reused constraints that are needed for
--- most functions involving 'UCyc' and 'Cyc'.
-
--- EAC: duplicated UCCtx for haddock
-type CElt t r = (Tensor t, CRTrans r, CRTrans (CRTExt r), CRTEmbed r,
-                 ZeroTestable r, TElt t r, TElt t (CRTExt r), Eq r, NFData r)
+-- most functions involving 'UCyc' and
+-- 'Crypto.Lol.Cyclotomic.Cyc.Cyc'.
+type CElt t r = (Tensor t, RElt t r, RElt t (CRTExt r),
+                 CRTEmbed r, Eq r, Random r)
 
 -- | Same as 'Crypto.Lol.Cyclotomic.Cyc.scalarCyc', but for 'UCyc'.
 scalarCyc :: (Fact m, CElt t a) => a -> UCyc t m a
@@ -92,10 +116,11 @@ scalarCyc = Scalar
 instance (UCCtx t r, Fact m, Eq r) => Eq (UCyc t m r) where
   -- handle same bases when fidelity allows (i.e., *not* CRTe basis)
   (Scalar v1) == (Scalar v2) = v1 == v2
-  (Pow v1) == (Pow v2) = v1 == v2 \\ witness entailFullT v1
-  (Dec v1) == (Dec v2) = v1 == v2 \\ witness entailFullT v1
-  (CRTr v1) == (CRTr v2) = v1 == v2 \\ witness entailFullT v1
+  (Pow v1) == (Pow v2) = v1 == v2 \\ witness entailEqT v1
+  (Dec v1) == (Dec v2) = v1 == v2 \\ witness entailEqT v1
+  (CRTr v1) == (CRTr v2) = v1 == v2 \\ witness entailEqT v1
 
+  -- compare in compositum
   (Sub (c1 :: UCyc t l1 r)) == (Sub (c2 :: UCyc t l2 r)) =
     (embed' c1 :: UCyc t (FLCM l1 l2) r) == embed' c2
     \\ lcmDivides (Proxy::Proxy l1) (Proxy::Proxy l2)
@@ -109,9 +134,9 @@ instance (UCCtx t r, Fact m, Eq r) => Eq (UCyc t m r) where
 -- ZeroTestable instance
 instance (UCCtx t r, Fact m) => ZeroTestable.C (UCyc t m r) where
   isZero (Scalar v) = isZero v
-  isZero (Pow v) = isZero v \\ witness entailFullT v
-  isZero (Dec v) = isZero v \\ witness entailFullT v
-  isZero (CRTr v) = isZero v \\ witness entailFullT v
+  isZero (Pow v) = isZero v \\ witness entailZTT v
+  isZero (Dec v) = isZero v \\ witness entailZTT v
+  isZero (CRTr v) = isZero v \\ witness entailZTT v
   isZero x@(CRTe _) = isZero $ toPow' x
   isZero (Sub c) = isZero c
 
@@ -126,11 +151,10 @@ instance (UCCtx t r, Fact m) => Additive.C (UCyc t m r) where
 
   -- SAME CONSTRUCTORS
   (Scalar c1) + (Scalar c2) = Scalar (c1+c2)
-  (Pow v1) + (Pow v2) = Pow $ v1 + v2 \\ witness entailFullT v1
-  (Dec v1) + (Dec v2) = Dec $ v1 + v2 \\ witness entailFullT v1
-  (CRTr v1) + (CRTr v2) = CRTr $ v1 + v2 \\ witness entailFullT v1
-  -- CJP: is this OK for precision?
-  (CRTe v1) + (CRTe v2) = CRTe $ v1 + v2 \\ witness entailFullT v1
+  (Pow v1) + (Pow v2) = Pow $ v1 + v2 \\ witness entailRingT v1
+  (Dec v1) + (Dec v2) = Dec $ v1 + v2 \\ witness entailRingT v1
+  (CRTr v1) + (CRTr v2) = CRTr $ v1 + v2 \\ witness entailRingT v1
+  (CRTe v1) + (CRTe v2) = CRTe $ v1 + v2 \\ witness entailRingT v1
   -- Sub plus Sub: work in compositum
   (Sub (c1 :: UCyc t m1 r)) + (Sub (c2 :: UCyc t m2 r)) =
     (Sub $ (embed' c1 :: UCyc t (FLCM m1 m2) r) + embed' c2)
@@ -142,15 +166,15 @@ instance (UCCtx t r, Fact m) => Additive.C (UCyc t m r) where
   p1@(Scalar _) + p2@(Dec _) = toDec' p1 + p2
   p1@(Scalar _) + p2@(CRTr _) = toCRT' p1 + p2
   p1@(Scalar _) + p2@(CRTe _) = toCRT' p1 + p2
-  (Scalar v1) + (Sub c2) = Sub $ Scalar v1 + c2
+  (Scalar c1) + (Sub c2) = Sub $ Scalar c1 + c2 -- must re-wrap Scalar!
 
   p1@(Pow _) + p2@(Scalar _) = p1 + toPow' p2
   p1@(Dec _) + p2@(Scalar _) = p1 + toDec' p2
   p1@(CRTr _) + p2@(Scalar _) = p1 + toCRT' p2
   p1@(CRTe _) + p2@(Scalar _) = p1 + toCRT' p2
-  (Sub c1) + (Scalar v2) = Sub $ c1 + Scalar v2
+  (Sub c1) + (Scalar c2) = Sub $ c1 + Scalar c2
 
-  -- SUB PLUS SOMETHING ELSE (NON-SCALAR): work in full ring
+  -- SUB PLUS NON-SUB, NON-SCALAR: work in full ring
   (Sub c1) + c2 = embed' c1 + c2
   c1 + (Sub c2) = c1 + embed' c2
 
@@ -183,8 +207,12 @@ instance (UCCtx t r, Fact m) => Ring.C (UCyc t m r) where
   _ * v2@(Scalar c2) | isZero c2 = v2
 
   -- BOTH IN A CRT BASIS
-  (CRTr v1) * (CRTr v2) = CRTr $ v1 * v2 \\ witness entailFullT v1
-  (CRTe v1) * (CRTe v2) = toPow' $ CRTe $ v1 * v2 \\ witness entailFullT v1
+  (CRTr v1) * (CRTr v2) = CRTr $ v1 * v2 \\ witness entailRingT v1
+  (CRTe v1) * (CRTe v2) = toPow' $ CRTe $ v1 * v2 \\ witness entailRingT v1
+
+  -- CRTr/CRTe mixture
+  (CRTr _) * (CRTe _) = error "UCyc.(*): mixed CRTr/CRTe"
+  (CRTe _) * (CRTr _) = error "UCyc.(*): mixed CRTr/CRTe"
 
   -- AT LEAST ONE SCALAR
   (Scalar c1) * (Scalar c2) = Scalar $ c1 * c2
@@ -192,27 +220,22 @@ instance (UCCtx t r, Fact m) => Ring.C (UCyc t m r) where
   (Scalar c) * (Pow v) = Pow $ fmapT (*c) v
   (Scalar c) * (Dec v) = Dec $ fmapT (*c) v
   (Scalar c) * (CRTr v) = CRTr $ fmapT (*c) v
-  s@(Scalar _) * c'@(CRTe _) = s * toPow' c'
-  (Scalar c) * (Sub c2) = Sub $ Scalar c * c2
+  (Scalar c) * (CRTe v) = CRTe $ fmapT (* toExt c) v
+  (Scalar c1) * (Sub c2) = Sub $ Scalar c1 * c2
 
   (Pow v) * (Scalar c) = Pow $ fmapT (*c) v
   (Dec v) * (Scalar c) = Dec $ fmapT (*c) v
   (CRTr v) * (Scalar c) = CRTr $ fmapT (*c) v
-  c'@(CRTe _) * s@(Scalar _) = toPow' c' * s
-  (Sub c1) * (Scalar c) = Sub $ c1 * Scalar c
+  (CRTe v) * (Scalar c) = CRTe $ fmapT (* toExt c) v
+  (Sub c1) * (Scalar c2) = Sub $ c1 * Scalar c2
 
-  -- AT LEAST ONE SUB
-
-  -- two Subs: work in compositum
+  -- TWO SUBS: work in a CRT rep for compositum
   (Sub (c1 :: UCyc t m1 r)) * (Sub (c2 :: UCyc t m2 r)) =
-    (Sub $ (embed' c1 :: UCyc t (FLCM m1 m2) r) * embed' c2)
+    -- re-wrap c1, c2 as Subs of the composition, and force them to CRT
+    (Sub $ (toCRT' $ Sub c1 :: UCyc t (FLCM m1 m2) r) * toCRT' (Sub c2))
     \\ lcm2Divides (Proxy::Proxy m1) (Proxy::Proxy m2) (Proxy::Proxy m)
 
-  -- Sub times something else (non-Scalar): work in full ring
-  (Sub c1) * p2 = embed' c1 * p2
-  p1 * (Sub c2) = p1 * embed' c2
-
-  -- ELSE: work in appropriate CRT basis
+  -- ELSE: work in appropriate CRT rep
   p1 * p2 = toCRT' p1 * toCRT' p2
 
   fromInteger = Scalar . fromInteger
@@ -221,7 +244,10 @@ instance (UCCtx t r, Fact m) => Ring.C (UCyc t m r) where
 instance (Reduce a b, Fact m, CElt t a, CElt t b)
   => Reduce (UCyc t m a) (UCyc t m b) where
 
-  reduce = fmapC reduce . forceAny
+  -- optimized for subring constructors
+  reduce (Scalar c) = Scalar $ reduce c
+  reduce (Sub (c :: UCyc t l a)) = Sub (reduce c :: UCyc t l b)
+  reduce x = fmapC reduce $ forceAny x
 
 -- promote Gadget from base ring
 instance (Gadget gad zq, Fact m, CElt t zq) => Gadget gad (UCyc t m zq) where
@@ -230,14 +256,20 @@ instance (Gadget gad zq, Fact m, CElt t zq) => Gadget gad (UCyc t m zq) where
   encode s = ((* adviseCRT s) <$>) <$> gadget
 
 -- promote Decompose, using the powerful basis
-instance (Decompose gad zq, Fact m, CElt t zq,
-          Reduce (UCyc t m (DecompOf zq)) (UCyc t m zq))
+instance (Decompose gad zq, Fact m,
+         -- these imply (superclass) Reduce on UCyc; needed for Sub case
+          CElt t zq, CElt t (DecompOf zq), Reduce (DecompOf zq) zq)
   => Decompose gad (UCyc t m zq) where
 
   type DecompOf (UCyc t m zq) = UCyc t m (DecompOf zq)
 
+  -- faster implementations: decompose directly in subring, which is
+  -- correct because we decompose in powerful basis
+  decompose (Scalar c) = pasteT $ Scalar <$> peelT (decompose c)
+  decompose (Sub c) = pasteT $ Sub <$> peelT (decompose c)
+
   -- traverse: Traversable (c m) and Applicative (Tagged gad ZL)
-  decompose = fromZL . traverse (toZL . decompose) . forcePow
+  decompose x = fromZL $ traverse (toZL . decompose) $ forcePow x
     where toZL :: Tagged s [a] -> TaggedT s ZipList a
           toZL = coerce
           fromZL :: TaggedT s ZipList a -> Tagged s [a]
@@ -247,34 +279,54 @@ instance (Decompose gad zq, Fact m, CElt t zq,
 instance (Correct gad zq, Fact m, CElt t zq)
          => Correct gad (UCyc t m zq) where
   -- sequenceA: Applicative (c m) and Traversable (TaggedT [])
-  correct bs = (correct . pasteT) <$> (sequenceA $ forceDec <$> peelT bs)
+  correct bs = (correct . pasteT) <$> sequenceA (forceDec <$> peelT bs)
 
 -- generic RescaleCyc instance
 
 instance {-# OVERLAPS #-} (Rescale a b, CElt t a, CElt t b)
          => U.RescaleCyc (UCyc t) a b where
-  rescaleCyc b = fmapC rescale . forceBasis (Just b)
+
+  -- Optimized for subring constructors, for powerful basis.
+  -- Analogs for decoding basis are not quite correct, because (* -1)
+  -- doesn't commute with 'rescale' due to tiebreakers!
+  rescaleCyc U.Pow (Scalar c) = Scalar $ rescale c
+  rescaleCyc U.Pow (Sub (c :: UCyc t l a)) =
+    Sub (U.rescaleCyc U.Pow c :: UCyc t l b)
+
+  rescaleCyc b x = fmapC rescale $ forceBasis (Just b) x
 
 -- specialized instance for product rings: ~2x faster algorithm
-instance (Mod a, Field b, Lift a z, Reduce z b,
-          CElt t a, CElt t b, CElt t (a,b), CElt t z)
+instance (Mod a, Field b, Lift a (ModRep a), Reduce (LiftOf a) b,
+          CElt t a, CElt t b, CElt t (a,b), CElt t (LiftOf a))
          => U.RescaleCyc (UCyc t) (a,b) b where
-  rescaleCyc bas =
+
+  -- optimized for subrings and powerful basis (see comments in other
+  -- instance for why this doesn't work for decoding basis)
+  rescaleCyc U.Pow (Scalar c) = Scalar $ rescale c
+  rescaleCyc U.Pow (Sub (c :: UCyc t l (a,b))) =
+    Sub (U.rescaleCyc U.Pow c :: UCyc t l b)
+
+  rescaleCyc bas x =
     let aval = proxy modulus (Proxy::Proxy a)
   -- CJP: could use unzipC here to get (a,b) in one pass, but it
   -- requires adding that method, and unzipT to Tensor and all its
   -- instances. Probably not worth it.
-    in \x -> let y = forceAny x
-                 a = fmapC fst y
-                 b = fmapC snd y
-                 z = liftCyc bas a
-             in (pure (recip (fromIntegral aval))) * (b - reduce z)
+        y = forceAny x
+        a = fmapC fst y
+        b = fmapC snd y
+        z = liftCyc bas a
+    in Scalar (recip (reduce aval)) * (b - reduce z)
 
--- | Same as 'Crypto.Lol.Cyclotomic.Cyc.liftCyc', but for 'UCyc'
+-- | Same as 'Crypto.Lol.Cyclotomic.Cyc.liftCyc', but for 'UCyc'.
 liftCyc :: (Lift b a, Fact m, CElt t a, CElt t b)
            => U.Basis -> UCyc t m b -> UCyc t m a
-liftCyc U.Pow = fmapC lift . forceBasis (Just U.Pow)
-liftCyc U.Dec = fmapC lift . forceBasis (Just U.Dec)
+-- optimized for subrings and powerful basis (see comments in
+-- RescaleCyc instances for why this doesn't work for decoding)
+liftCyc U.Pow (Scalar c) = Scalar $ lift c
+liftCyc U.Pow (Sub c) = Sub $ liftCyc U.Pow c
+
+liftCyc U.Pow x = fmapC lift $ forceBasis (Just U.Pow) x
+liftCyc U.Dec x = fmapC lift $ forceBasis (Just U.Dec) x
 
 -- | Same as 'Crypto.Lol.Cyclotomic.Cyc.adviseCRT', but for 'UCyc'.
 adviseCRT :: (Fact m, CElt t r) => UCyc t m r -> UCyc t m r
@@ -288,9 +340,9 @@ mulG (Scalar c) = Pow $ mulGPow $ scalarPow c -- must go to full ring
 mulG (Sub c) = mulG $ embed' c                -- must go to full ring
 mulG (Pow v) = Pow $ mulGPow v
 mulG (Dec v) = Dec $ mulGDec v
--- fromJust is safe here because we're already in CRTr
-mulG (CRTr v) = CRTr $ fromMaybe (error "FC.mulG CRTr") mulGCRT v
-mulG (CRTe v) = CRTe $ fromMaybe (error "FC.mulG CRTe") mulGCRT v
+-- fromMaybe is safe here because we're already in CRTr
+mulG (CRTr v) = CRTr $ fromJust' "UCyc.mulG CRTr" mulGCRT v
+mulG (CRTe v) = CRTe $ fromJust' "UCyc.mulG CRTe" mulGCRT v
 
 -- | Same as 'Crypto.Lol.Cyclotomic.Cyc.divG', but for 'UCyc'.
 divG :: (Fact m, CElt t r) => UCyc t m r -> Maybe (UCyc t m r)
@@ -298,9 +350,9 @@ divG (Scalar c) = liftM Pow (divGPow $ scalarPow c) -- full ring
 divG (Sub c) = divG $ embed' c                      -- full ring
 divG (Pow v) = Pow <$> divGPow v
 divG (Dec v) = Dec <$> divGDec v
--- fromJust is safe here because we're already in CRTr
-divG (CRTr v) = Just $ CRTr $ fromMaybe (error "FC.divG CRTr") divGCRT v
-divG (CRTe v) = Just $ CRTe $ fromMaybe (error "FC.divG CRTe") divGCRT v
+-- fromMaybe is safe here because we're already in CRTr
+divG (CRTr v) = Just $ CRTr $ fromJust' "UCyc.divG CRTr" divGCRT v
+divG (CRTe v) = Just $ CRTe $ fromJust' "UCyc.divG CRTe" divGCRT v
 
 -- | Same as 'Crypto.Lol.Cyclotomic.Cyc.tGaussian', but for 'UCyc'.
 tGaussian :: (Fact m, OrdFloat q, Random q, CElt t q,
@@ -312,7 +364,7 @@ tGaussian = liftM Dec . tGaussianDec
 errorRounded :: forall v rnd t m z .
                 (ToInteger z, Fact m, CElt t z, ToRational v, MonadRandom rnd)
                 => v -> rnd (UCyc t m z)
-errorRounded svar = 
+errorRounded svar =
   fmapC (roundMult one) <$> (tGaussian svar :: rnd (UCyc t m Double))
 
 -- | Same as 'Crypto.Lol.Cyclotomic.Cyc.errorCoset', but for 'UCyc'.
@@ -351,14 +403,17 @@ twace (Sub (c :: UCyc t l r)) =
   \\ gcdDivides (Proxy::Proxy l) (Proxy::Proxy m)
 twace (Pow v) = Pow $ twacePowDec v
 twace (Dec v) = Dec $ twacePowDec v
--- stay in CRTr only if it's possible, otherwise go to Pow
+-- stay in CRTr only iff it's valid for target, else go to Pow
 twace x@(CRTr v) =
   fromMaybe (twace $ toPow' x) (CRTr <$> (twaceCRT <*> pure v))
--- CJP: stay in CRTe: precision OK?
-twace (CRTe v) = CRTe $ fromMaybe (error "FC.twace CRTe") twaceCRT v
+-- stay in CRTe iff CRTr is invalid for target, else go to Pow
+twace x@(CRTe v) =
+  fromMaybe (CRTe $ fromJust' "UCyc.twace CRTe" twaceCRT v)
+            (proxy (pasteT hasCRTFuncs) (Proxy::Proxy (t m r)) *>
+             pure (twace $ toPow' x))
 
 -- | Same as 'Crypto.Lol.Cyclotomic.Cyc.coeffsCyc', but for 'UCyc'.
-coeffsCyc :: (m `Divides` m', CElt t r) 
+coeffsCyc :: (m `Divides` m', CElt t r)
              => U.Basis -> UCyc t m' r -> [UCyc t m r]
 coeffsCyc U.Pow (Pow v) = LP.map Pow $ coeffs v
 coeffsCyc U.Dec (Dec v) = LP.map Dec $ coeffs v
@@ -371,7 +426,7 @@ powBasis = map Pow <$> powBasisPow
 
 -- | Same as 'Crypto.Lol.Cyclotomic.Cyc.crtSet', but for 'UCyc'.
 crtSet :: forall t m m' r p mbar m'bar .
-           (m `Divides` m', ZPP r, p ~ CharOf (ZPOf r), 
+           (m `Divides` m', ZPP r, p ~ CharOf (ZPOf r),
             mbar ~ PFree p m, m'bar ~ PFree p m',
             CElt t r, CElt t (ZPOf r))
            => Tagged m [UCyc t m' r]
@@ -391,19 +446,16 @@ crtSet =
 
 ----- "Unsafe" functions that expose or rely upon internal representation
 
--- | Yield an equivalent element whose internal representation
--- /must/ be in the indicated basis: powerful or decoding (for 'Just
--- Pow' and 'Just Dec' arguments, respectively), or any @r@-basis of
--- the implementation's choice (for 'Nothing' argument).  This
--- method affects the behavior of the 'Functor', 'Applicative',
--- etc. instances, and /must/ be called immediately before using the
--- methods of these classes, otherwise their behavior is undefined
--- and potentially an error.  (See also the convenient
--- specializations 'forcePow', 'forceDec', 'forceAny'.)
+-- | Yield an equivalent element whose internal representation /must/
+-- be in the indicated basis: powerful or decoding (for 'Just' 'Pow'
+-- and 'Just' 'Dec' arguments, respectively), or any @r@-basis of the
+-- implementation's choice (for 'Nothing' argument).  (See also the
+-- convenient specializations 'forcePow', 'forceDec', 'forceAny'.)
 forceBasis :: (Fact m, CElt t r) => Maybe U.Basis -> UCyc t m r -> UCyc t m r
 forceBasis (Just U.Pow) x = toPow' x
 forceBasis (Just U.Dec) x = toDec' x
 forceBasis Nothing x@(Scalar _) = toPow' x
+-- force as outermost op to ensure we get an r-basis
 forceBasis Nothing (Sub c) = forceBasis Nothing $ embed' c
 forceBasis Nothing x@(CRTe _) = toPow' x
 forceBasis Nothing x = x
@@ -452,20 +504,21 @@ fmapCM f (CRTr v) = liftM CRTr $ fmapTM f v
 
 ---------- HELPER FUNCTIONS (NOT FOR EXPORT) ----------
 
--- | Force embed, to a non-Sub constructor.
+-- | Force embed, to a non-'Sub' constructor.  Preserves Scalar, Pow,
+-- Dec constructors, and CRTr/CRTe constructor if valid in both source
+-- and target ring (we rely on this in toCRT').
 embed' :: forall t r l m .
           (UCCtx t r, l `Divides` m) => UCyc t l r -> UCyc t m r
-embed' (Scalar v) = Scalar v
+embed' (Scalar x) = Scalar x    -- must re-wrap!
 embed' (Pow v) = Pow $ embedPow v
 embed' (Dec v) = Dec $ embedDec v
 -- stay in CRTr only if it's possible, otherwise go to Pow
 embed' x@(CRTr v) =
     fromMaybe (embed' $ toPow' x) (CRTr <$> (embedCRT <*> pure v))
--- Staying in CRTe might not be safe, because the target tensor
--- might have implemented a CRTr even if the source tensor
--- hasn't.  Mathematically this is impossible (because target has
--- CRTr only if source does), so this is purely about implementation.
-embed' x@(CRTe _) = embed' $ toPow' x
+embed' x@(CRTe v) = -- go to CRTe iff CRTr is invalid for target index
+    fromMaybe (CRTe $ fromJust' "UCyc.embed' CRTe" embedCRT v)
+              (proxy (pasteT hasCRTFuncs) (Proxy::Proxy (t m r)) *>
+               pure (embed' $ toPow' x))
 embed' (Sub (c :: UCyc t k r)) = embed' c
   \\ transDivides (Proxy::Proxy k) (Proxy::Proxy l) (Proxy::Proxy m)
 
@@ -475,48 +528,58 @@ embed' (Sub (c :: UCyc t k r)) = embed' c
 toPow', toDec' :: (UCCtx t r, Fact m) => UCyc t m r -> UCyc t m r
 -- forces the argument into the powerful basis
 toPow' (Scalar c) = Pow $ scalarPow c
-toPow' (Sub c) = toPow' $ embed' c
+toPow' (Sub c) = embed' $ toPow' c -- OK: embed' preserves Pow
 toPow' x@(Pow _) = x
 toPow' (Dec v) = Pow $ l v
-toPow' (CRTr v) = Pow $ fromMaybe (error "FC.toPow'") crtInv v
-toPow' (CRTe v) = Pow $ fmapT fromExt $ fromMaybe (error "FC.toPow'") crtInv v
+toPow' (CRTr v) = Pow $ fromJust' "UCyc.toPow'" crtInv v
+toPow' (CRTe v) =
+    Pow $ fmapT fromExt $ fromJust' "UCyc.toPow' CRTe" crtInv v
 
--- forces the argument into the decoding basis
-toDec' x@(Scalar _) = toDec' $ toPow' x -- use scalarDec instead
-toDec' (Sub c) = toDec' $ embed' c
+-- | Force the argument into the decoding basis.
+toDec' x@(Scalar _) = toDec' $ toPow' x -- TODO: use scalarDec instead
+toDec' (Sub c) = embed' $ toDec' c      -- OK: embed' preserves Dec
 toDec' (Pow v) = Dec $ lInv v
 toDec' x@(Dec _) = x
-toDec' (CRTr v) = Dec $ lInv $ fromMaybe (error "FC.toDec'") crtInv v
-toDec' (CRTe v) = Dec $ lInv $ fmapT fromExt $ fromMaybe (error "FC.toDec'") crtInv v
+toDec' x@(CRTr _) = toDec' $ toPow' x
+toDec' x@(CRTe _) = toDec' $ toPow' x
 
--- forces the argument into a CRT basis, according to the invariant
--- about which one should be used
+-- | Force the argument into the "valid" CRT basis for our invariant.
 toCRT' :: forall t m r . (UCCtx t r, Fact m) => UCyc t m r -> UCyc t m r
-toCRT' (Sub c) = toCRT' $ embed' c
 toCRT' x@(CRTr _) = x
 toCRT' x@(CRTe _) = x
+toCRT' (Sub (c :: UCyc t l r)) =
+    case (proxyT hasCRTFuncs (Proxy::Proxy (t l r)),
+          proxyT hasCRTFuncs (Proxy::Proxy (t m r))) of
+      (Just _, Just _) -> embed' $ toCRT' c -- fastest; embed' preserves CRTr
+      (_, Nothing) -> embed' $ toCRTe c -- faster; temp violate CRTr/e invariant
+      _ -> toCRT' $ embed' c            -- fallback
 toCRT' x = fromMaybe (toCRTe x) (toCRTr <*> pure x)
-  -- CJP: defining these helpers internally so they can't be called
-  -- from anywhere else.  Therefore, the only way to convert to a
-  -- CRT basis is through the toCRT' method.
-  where
-    toCRTr = do -- Maybe monad
-      crt' <- crt
-      scalarCRT' <- scalarCRT
-      return $ \x -> case x of
-        (Scalar c) -> CRTr $ scalarCRT' c
-        (Pow v) -> CRTr $ crt' v
-        (Dec v) -> CRTr $ crt' $ l v
-          -- deliberately omit CRTe case, which should
-          -- never happen by internal invariant, so trigger
-          -- error if it does
-    toCRTe = let m = proxy valueFact (Proxy::Proxy m)
-                 crt' = fromMaybe (error $ "FC.toCRT': no crt': " ++ (show m)) crt :: t m (CRTExt r) -> t m (CRTExt r) -- must exist
-                 scalarCRT' = fromMaybe (error "FC.toCRT': no scalar crt'") scalarCRT :: CRTExt r -> t m (CRTExt r)
-             in \x -> case x of
-               (Scalar c) -> CRTe $ scalarCRT' $ toExt c
-               (Pow v) -> CRTe $ crt' $ fmapT toExt v
-               (Dec v) -> CRTe $ crt' $ fmapT toExt $ l v
+
+toCRTr :: forall t m r . (UCCtx t r, Fact m) => Maybe (UCyc t m r -> UCyc t m r)
+toCRTr = do -- Maybe monad
+  crt' <- crt
+  scalarCRT' <- scalarCRT
+  return $ \x -> case x of
+                   (Scalar c) -> CRTr $ scalarCRT' c
+                   (Pow v) -> CRTr $ crt' v
+                   (Dec v) -> CRTr $ crt' $ l v
+                   c@(CRTr _) -> c
+                   c@(CRTe _) -> fromJust' "UCyc.toCRTr CRTe" toCRTr $ toPow' c
+                   (Sub _) -> error "UCyc.toCRTr: Sub"
+
+toCRTe :: forall t m r . (UCCtx t r, Fact m) => UCyc t m r -> UCyc t m r
+toCRTe = let m = proxy valueFact (Proxy::Proxy m)
+             crt' = fromJust' ("UCyc.toCRTe: no crt': " ++ show m) crt
+                  :: t m (CRTExt r) -> t m (CRTExt r) -- must exist
+             scalarCRT' = fromJust' "UCyc.toCRTe: no scalarCRT" scalarCRT
+                        :: CRTExt r -> t m (CRTExt r)
+         in \x -> case x of
+                    (Scalar c) -> CRTe $ scalarCRT' $ toExt c
+                    (Pow v) -> CRTe $ crt' $ fmapT toExt v
+                    (Dec v) -> CRTe $ crt' $ fmapT toExt $ l v
+                    c@(CRTr _) -> toCRTe $ toPow' c
+                    c@(CRTe _) -> c
+                    (Sub _) -> error "UCyc.toCRTe: Sub"
 
 ---------- "Container" instances ----------
 
@@ -524,20 +587,21 @@ instance (Tensor t, Fact m) => Functor (UCyc t m) where
   -- Functor instance is implied by Applicative laws
   fmap f x = pure f <*> x
 
+errApp :: String -> a
 errApp name = error $ "UCyc.Applicative: can't/won't handle " ++ name ++
-              "; call forcePow|Dec first"
+              "; call forcePow|Dec|Any first"
 
 instance (Tensor t, Fact m) => Applicative (UCyc t m) where
 
-  -- This implementation is restricted to the Scalar, Pow, Dec, or CRTr
-  -- constructors, in order to force the client to choose a concrete
-  -- basis and avoid unanticipated non-failure behavior.  Encountering
-  -- a CRTe, or Sub constructor almost certainly means that the
-  -- client expressed something it did not intend (since it cannot
-  -- force such constructors to be used), so we want to raise an
-  -- exception early instead of doing unintended work.
+  -- This implementation is restricted to the Scalar, Pow, Dec, or
+  -- CRTr constructors, in order to force the client to choose a
+  -- concrete @r@-basis and avoid unanticipated non-failure behavior.
+  -- Encountering a CRTe, or Sub constructor almost certainly means
+  -- that the client expressed something it did not intend (since it
+  -- cannot force such constructors to be used), so we want to raise
+  -- an exception early instead of doing unintended work.
 
-  -- CJP: this implementation has one corner case that may
+  -- This implementation has one corner case that may
   -- yield unexpected non-failure behavior: consider
   --   fmap f (pure a) = (pure f) <*> (pure a) = (pure $ f a)
   -- which is required by the Applicative homomorphism law.
@@ -555,11 +619,7 @@ instance (Tensor t, Fact m) => Applicative (UCyc t m) where
   -- A solution is to introduce an explicit Pure constructor that's
   -- only ever applied in 'pure', and throw an error if we encounter a
   -- Scalar here.  Arithmetically we'd treat Pures as Scalars, but in
-  -- a one-way fashion (outputs of arith ops are never Pure).\
-
-  -- EAC: For the contract on Applicative instances for Cyclotomics,
-  -- we want to say that the operation outputs in the same basis as the input
-  -- Which basis do we use for (<*>)?
+  -- a one-way fashion (outputs of arith ops are never Pure).
 
   pure = Scalar
 
@@ -581,12 +641,11 @@ instance (Tensor t, Fact m) => Applicative (UCyc t m) where
   (CRTr v) <*> (Scalar a) = CRTr $ v <*> pure a \\ witness entailIndexT v
 
   -- cases we can't/won't handle
-  (Pow _) <*> (Dec _) = error "UCyc.Applicative: Pow/Dec combo"
-  (Dec _) <*> (Pow _) = error "UCyc.Applicative: Pow/Dec combo"
   (Sub _) <*> _  = errApp "Sub"
   _ <*> (Sub _)  = errApp "Sub"
   (CRTe _) <*> _ = errApp "CRTe"
   _ <*> (CRTe _) = errApp "CRTe"
+  _ <*> _ = errApp "mismatched Pow/Dec/CRTr bases"
 
 instance (Tensor t, Fact m) => Foldable (UCyc t m) where
   foldr f b (Scalar r) = f r b
@@ -606,13 +665,13 @@ instance (Tensor t, Fact m) => Traversable (UCyc t m) where
 
 ---------- Utility instances ----------
 
-instance (Tensor t, Fact m, TElt t r, CRTrans r) => Random (UCyc t m r) where
+instance (Tensor t, Fact m, TElt t r, CRTrans r, Random r, ZeroTestable r, IntegralDomain r) => Random (UCyc t m r) where
 
   -- create in CRTr basis if legal, otherwise in powerful
   random = let cons = fromMaybe Pow
                       (proxyT hasCRTFuncs (Proxy::Proxy (t m r)) >> Just CRTr)
            in \g -> let (v,g') = random g
-                                 \\ proxy entailFullT (Proxy::Proxy (t m r))
+                                 \\ proxy entailRandomT (Proxy::Proxy (t m r))
                     in (cons v, g')
 
   randomR _ = error "randomR non-sensical for cyclotomic rings"
@@ -631,11 +690,11 @@ instance (Arbitrary (t m r)) => Arbitrary (UCyc t m r) where
   arbitrary = liftM Pow arbitrary
   shrink = shrinkNothing
 
-instance (Tensor t, Fact m, NFData r, TElt t r, TElt t (CRTExt r))
+instance (Tensor t, Fact m, TElt t r, TElt t (CRTExt r), NFData r, NFData (CRTExt r))
          => NFData (UCyc t m r) where
-  rnf (Pow x)    = rnf x \\ witness entailFullT x
-  rnf (Dec x)    = rnf x \\ witness entailFullT x
-  rnf (CRTr x)   = rnf x \\ witness entailFullT x
-  rnf (CRTe x)   = rnf x \\ witness entailFullT x
+  rnf (Pow x)    = rnf x \\ witness entailNFDataT x
+  rnf (Dec x)    = rnf x \\ witness entailNFDataT x
+  rnf (CRTr x)   = rnf x \\ witness entailNFDataT x
+  rnf (CRTe x)   = rnf x \\ witness entailNFDataT x
   rnf (Scalar x) = rnf x
   rnf (Sub x)    = rnf x

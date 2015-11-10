@@ -7,26 +7,25 @@
 
 module Crypto.Lol.Applications.SymmSHE
 (
--- * Algorithm inputs
+-- * Data types
 SK, PT, CT                    -- don't export constructors!
--- * Encryption functions
-, genSK, encrypt
--- * Decryption functions
+-- * Keygen, encryption, decryption
+, genSK
+, encrypt
 , errorTerm, errorTermUnrestricted, decrypt, decryptUnrestricted
--- * Functions for changing representation of a ciphertext
+-- * Encoding of plaintext
 , toMSD, toLSD
 -- * Arithmetic with public values
 , addScalar, addPublic, mulPublic
--- * Embedding/Twacing for keys and ciphertexts
-, embedSK, embedCT, twaceCT
--- * Functions for changing the CT/PT modulus
+-- * Modulus switching
 , rescaleLinearCT, modSwitchPT
 -- * Key switching
 , keySwitchLinear, keySwitchQuadCirc
 -- * Ring switching
-,tunnelCT
+, embedSK, embedCT, twaceCT
+, tunnelCT
 -- * Constraint synonyms
-, AddPublicCtx, MulPublicCtx, KeySwitchCtx, KSHintCtx, ModSwitchPTCtx
+, AddPublicCtx, MulPublicCtx, InnerKeySwitchCtx, KeySwitchCtx, KSHintCtx, ModSwitchPTCtx
 , ToSDCtx, EncryptCtx, TunnelCtx, GenSKCtx, DecryptCtx
 , ErrorTermCtx
 ) where
@@ -201,7 +200,7 @@ rescaleLinearMSD c = case coeffs c of
   _ -> error $ "rescaleLinearMSD: list too long (not linear): " ++
        show (length $ coeffs c)
 
--- | Rescale a linear ciphertext.
+-- | Rescale a linear ciphertext to a new modulus.
 rescaleLinearCT :: (RescaleCyc (Cyc t) zq zq', ToSDCtx t m' zp zq)
            => CT m zp (Cyc t m' zq) -> CT m zp (Cyc t m' zq')
 rescaleLinearCT ct = let CT MSD k l c = toMSD ct
@@ -229,10 +228,11 @@ type LWECtx t m' z zq =
 lweSample :: (LWECtx t m' z zq, MonadRandom rnd)
              => SK (Cyc t m' z) -> rnd (Polynomial (Cyc t m' zq))
 lweSample (SK svar s) =
-  let sq = adviseCRT $ negate $ reduce s
+  -- adviseCRT because we call `replicateM (lweSample s)` below, but only want to do CRT once. 
+  let sq = adviseCRT $ negate $ reduce s 
   in do
     e <- errorRounded svar
-    c1 <- getRandom
+    c1 <- adviseCRT <$> getRandom -- we would like hints to be in CRT form
     return $ fromCoeffs [c1 * sq + reduce (e `asTypeOf` s), c1]
 
 -- | Constraint synonym for generating key-switch hints.
@@ -246,7 +246,7 @@ type KSHintCtx gad t m' z zq =
 ksHint :: (KSHintCtx gad t m' z zq, MonadRandom rnd)
           => SK (Cyc t m' z) -> Cyc t m' z
           -> rnd (Tagged gad [Polynomial (Cyc t m' zq)])
-ksHint skout val = do           -- rnd monad
+ksHint skout val = do -- rnd monad
   let valq = reduce val
       valgad = encode valq
   -- CJP: clunky, but that's what we get without a MonadTagged
@@ -262,6 +262,7 @@ type KnapsackCtx t (m' :: Factored) z zq' =
 
 knapsack :: forall t m' z zq' . (KnapsackCtx t m' z zq')
             => [Polynomial (Cyc t m' zq')] -> [Cyc t m' z] -> Polynomial (Cyc t m' zq')
+-- adviseCRT here because we are about to map (*) onto each polynomial coeff
 knapsack hint xs = sum (zipWith (*>>) (adviseCRT <$> reduce <$> xs) hint)
 
 type InnerKeySwitchCtx gad t m' zq zq' =
@@ -277,10 +278,7 @@ switch hint c = rescaleLinearMSD $ untag $ knapsack <$>
 
 -- | Constraint synonym for key switching.
 type KeySwitchCtx gad t m' zp zq zq' =
-  (ToSDCtx t m' zp zq,
-   -- EAC: same as InnerKeySwitchCtx, but duplicated for haddock
-   RescaleCyc (Cyc t) zq' zq, RescaleCyc (Cyc t) zq zq',
-   Decompose gad zq', KnapsackCtx t m' (DecompOf zq') zq')
+  (ToSDCtx t m' zp zq, InnerKeySwitchCtx gad t m' zq zq')
 
 -- | Switch a linear ciphertext under @s_in@ to a linear one under @s_out@
 keySwitchLinear :: forall gad t m' zp zq zq' z rnd m .
@@ -452,9 +450,11 @@ twaceCT :: (CElt t zq, r `Divides` r', s' `Divides` r',
 twaceCT (CT d 0 l c) = CT d 0 l (twace <$> c)
 twaceCT _ = error "twaceCT requires 0 factors of g; call absorbGFactors first"
 
+
 -- | Constraint synonym for ring tunneling.
 type TunnelCtx t e r s e' r' s' z zp zq zq' gad =
   (ExtendLinIdx e r s e' r' s',     -- liftLin
+   e' ~ (e * (r' / r)),             -- convenience; implied by prev constraint
    KSHintCtx gad t r' z zq',        -- ksHint
    Reduce z zq,                     -- Reduce on Linear
    Lift zp z,                       -- liftLin
@@ -474,6 +474,7 @@ tunnelCT :: forall gad t e r s e' r' s' z zp zq zq' rnd .
 tunnelCT f skout (SK _ sin) = tagT $ (do -- in rnd
   -- generate hints
   let f' = extendLin $ lift f :: Linear t z e' r' s'
+      f'q = reduce f' :: Linear t zq e' r' s'
       -- choice of basis here must match coeffsCyc basis below
       ps = proxy powBasis (Proxy::Proxy e')
       comps = (evalLin f' . (adviseCRT sin *)) <$> ps
@@ -482,7 +483,7 @@ tunnelCT f skout (SK _ sin) = tagT $ (do -- in rnd
     let CT MSD 0 s c = toMSD $ absorbGFactors ct'
         [c0,c1] = coeffs c
         -- apply E-linear function to constant term c0
-        c0' = evalLin (reduce f' :: Linear t zq e' r' s') c0
+        c0' = evalLin f'q c0
         -- apply E-linear function to c1 via key-switching
         -- this basis must match the basis used above to generate the hints
         c1s = coeffsCyc Pow c1 :: [Cyc t e' zq]

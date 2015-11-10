@@ -59,7 +59,6 @@ toRT :: Unbox r => RT m r -> RT m r
 toRT v@(RT _) = v
 toRT (ZV v) = RT $ zvToArr v
 
--- EAC: this does more work than is necessary, since any vector in RT m r should have length @m@.
 toZV :: Fact m => RT m r -> RT m r
 toZV (RT (Arr v)) = ZV $ fromMaybe (error "toZV: internal error") $
                     iZipVector $ convert $ toUnboxed v
@@ -76,12 +75,14 @@ wrapM f (ZV v) = liftM RT $ f $ zvToArr v
 
 instance Tensor RT where
 
-  type TElt RT r = (IntegralDomain r, ZeroTestable r,
-                    Eq r, Random r, NFData r,
-                    Unbox r, Elt r)
+  type TElt RT r = (Unbox r, Elt r)
 
   entailIndexT  = tag $ Sub Dict
-  entailFullT   = tag $ Sub Dict
+  entailEqT = tag $ Sub Dict
+  entailZTT = tag $ Sub Dict
+  entailRingT = tag $ Sub Dict
+  entailNFDataT = tag $ Sub Dict
+  entailRandomT = tag $ Sub Dict
 
   scalarPow = RT . scalarPow'
 

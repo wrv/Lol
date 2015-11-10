@@ -4,19 +4,25 @@
              RankNTypes, ScopedTypeVariables, StandaloneDeriving,
              TypeFamilies, TypeOperators, UndecidableInstances #-}
 
--- | An implementation of cyclotomic rings.  All functions and
--- instances involving 'Cyc' expose nothing about the internal
--- representations of ring elements (e.g., the basis they are
+-- | An implementation of cyclotomic rings with safe interface:
+-- functions and instances involving 'Cyc' expose nothing about the
+-- internal representations of ring elements (e.g., the basis they are
 -- represented in).  For an experts-only, "unsafe" implementation that
--- offers limited exposure of internal representation, use 'UCyc'.
+-- offers limited exposure of internal representation, use
+-- 'Crypto.Lol.Cyclotomic.UCyc.UCyc'.
 
 module Crypto.Lol.Cyclotomic.Cyc
-( Cyc, U.CElt, cyc, unsafeUnCyc
+( 
+-- * Data type
+  Cyc, U.CElt, cyc, unsafeUnCyc
+-- * Basic operations
 , mulG, divG
+, scalarCyc, liftCyc
+, advisePow, adviseDec, adviseCRT
+-- * Error sampling
 , tGaussian, errorRounded, errorCoset
+-- * Sub/extension rings
 , embed, twace, powBasis, crtSet, coeffsCyc
-, adviseCRT
-, liftCyc, scalarCyc
 , module Crypto.Lol.Cyclotomic.Utility
 ) where
 
@@ -42,10 +48,11 @@ import Test.QuickCheck
 newtype Cyc t m r = Cyc { 
   -- | Unsafe deconstructor for 'Cyc'.
   unsafeUnCyc :: UCyc t m r }
-                    deriving (Arbitrary, NFData, Random)
+                    deriving (Arbitrary, Random)
 
 -- See: https://ghc.haskell.org/trac/ghc/ticket/11008
 -- for why I have to use StandaloneDeriving here
+deriving instance NFData (UCyc t m a) => NFData (Cyc t m a)
 deriving instance Show (UCyc t m a) => Show (Cyc t m a)
 deriving instance Eq (UCyc t m a) => Eq (Cyc t m a)
 deriving instance Additive (UCyc t m a) => Additive.C (Cyc t m a)
@@ -88,27 +95,37 @@ instance (Decompose gad (UCyc t m zq),
 
 ---------- Core cyclotomic operations ----------
 
+adviseCRT, advisePow, adviseDec :: (Fact m, CElt t r) => Cyc t m r -> Cyc t m r
+
 -- | Yield an equivalent element that /may/ be in a CRT
 -- representation.  This can serve as an optimization hint. E.g.,
 -- call 'adviseCRT' prior to multiplying the same value by many
 -- other values.
-adviseCRT :: (Fact m, CElt t r) => Cyc t m r -> Cyc t m r
 adviseCRT = coerceCyc U.adviseCRT
+
+-- | Same as 'adviseCRT', but for the powerful-basis representation.
+advisePow = coerceCyc U.forcePow -- do it, but not required by contract
+
+-- | Same as 'adviseCRT', but for the powerful-basis representation.
+adviseDec = coerceCyc U.forceDec
+
 
 -- | Multiply by the special element @g@ of the @m@th cyclotomic.
 mulG :: (Fact m, CElt t r) => Cyc t m r -> Cyc t m r
 mulG = coerceCyc U.mulG
 
 -- | Divide by @g@, returning 'Nothing' if not evenly divisible.
--- WARNING: this is not a constant-time operation, so information
--- about the argument may be leaked through a timing channel.
+-- WARNING: this implementation is not a constant-time algorithm, so
+-- information about the argument may be leaked through a timing
+-- channel.
 divG :: (Fact m, CElt t r) => Cyc t m r -> Maybe (Cyc t m r)
 divG = coerceCyc U.divG
 
 -- | Sample from the "tweaked" Gaussian error distribution @t*D@ in
--- the decoding basis, where @D@ has scaled variance @v@.
--- Note: This implementation uses Double precision to generate the
--- Gaussian sample, which is not cryptographically secure.
+-- the decoding basis, where @D@ has scaled variance @v@.  Note: This
+-- implementation uses Double precision to generate the Gaussian
+-- sample, which may not be sufficient for rigorous proof-based
+-- security.
 tGaussian :: (Fact m, OrdFloat q, Random q, CElt t q,
               ToRational v, MonadRandom rnd)
              => v -> rnd (Cyc t m q)
