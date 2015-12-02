@@ -50,12 +50,11 @@ data CTDummyOps :: (* -> *) where
 
   --http://stackoverflow.com/questions/28870198/polykinds-in-gadt-constructors
   TunnDummy :: 
-    (TunnelCtx c e r s e' r' s' z zp zq zq' gad, e ~ FGCD r s, Fact r,
+    (TunnelCtx c e r s e' r' s' z zp zq gad, e ~ FGCD r s, Fact r,
      Typeable c, Typeable r', Typeable s', Typeable z, Typeable s, Typeable r, 
-     Typeable gad, Typeable zq', Typeable zq, Typeable zp, CElt c (ZPOf zp),
+     Typeable gad, Typeable zq, Typeable zp, CElt c (ZPOf zp),
      ZPP zp)
-           => proxy gad -> proxy zq'
-              -> CTDummyOps (CT r zp (Cyc c r' zq) :-> Full (CT s zp (Cyc c s' zq)))
+           => proxy gad -> CTDummyOps (CT r zp (Cyc c r' zq) :-> Full (CT s zp (Cyc c s' zq)))
 
   deriving (Typeable)
 
@@ -64,14 +63,14 @@ instance EvalEnv CTDummyOps env
 
 instance Symbol CTDummyOps where
   rnfSym (KeySwQDummy _ _) = ()
-  rnfSym (TunnDummy _ _) = ()
+  rnfSym (TunnDummy _) = ()
 
   symSig (KeySwQDummy _ _) = signature
-  symSig (TunnDummy _ _) = signature
+  symSig (TunnDummy _) = signature
 
 instance Render CTDummyOps where
   renderSym (KeySwQDummy _ _) = "keySwQuadDummy"
-  renderSym (TunnDummy _ _) = "tunnDummy"
+  renderSym (TunnDummy _) = "tunnDummy"
 
 -- no eval instance for CTDummyOps
 instance Eval CTDummyOps where
@@ -82,12 +81,12 @@ ksqDummy :: forall dom gad c m m' z zp zq zq' .
   => ASTF dom (CT m zp (Cyc c m' zq)) -> Tagged '(gad, zq') (ASTF dom (CT m zp (Cyc c m' zq)))
 ksqDummy = return . (inj (KeySwQDummy (Proxy::Proxy gad) (Proxy::Proxy zq')) :$)
 
-type ASTTunnelCtx dom gad c r r' s s' e e' z zp zq zq' =
-  (CTDummyOps :<: dom, TunnelCtx c e r s e' r' s' z zp zq zq' gad, e ~ FGCD r s, 
+type ASTTunnelCtx dom gad c r r' s s' e e' z zp zq =
+  (CTDummyOps :<: dom, TunnelCtx c e r s e' r' s' z zp zq gad, e ~ FGCD r s, 
    Fact r, Typeable c, Typeable r', Typeable s', Typeable z, Typeable s, Typeable r,
-   Typeable gad, Typeable zq', Typeable zq, Typeable zp, CElt c (ZPOf zp), ZPP zp)
+   Typeable gad, Typeable zq, Typeable zp, CElt c (ZPOf zp), ZPP zp)
 
-tunnDummy :: forall dom gad c r r' s s' e e' z zp zq zq' . 
-  (ASTTunnelCtx dom gad c r r' s s' e e' z zp zq zq')
-  => ASTF dom (CT r zp (Cyc c r' zq)) -> Tagged '(gad, zq') (ASTF dom (CT s zp (Cyc c s' zq)))
-tunnDummy = return . (inj (TunnDummy (Proxy::Proxy gad) (Proxy::Proxy zq')) :$)
+tunnDummy :: forall dom gad c r r' s s' e e' z zp zq . 
+  (ASTTunnelCtx dom gad c r r' s s' e e' z zp zq)
+  => ASTF dom (CT r zp (Cyc c r' zq)) -> Tagged gad (ASTF dom (CT s zp (Cyc c s' zq)))
+tunnDummy = return . (inj (TunnDummy (Proxy::Proxy gad)) :$)

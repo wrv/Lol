@@ -164,7 +164,6 @@ test-suite lol-test-suite
     time>=1.2 && < 1.6,
     type-natural,
     vector
--- REMOVE THE FOLLOWING STUFF BEFORE GOING TO HACKAGE
 
 executable ast
   default-language:   Haskell2010

@@ -90,11 +90,13 @@ errRatio ct sk =
   (fromIntegral $ proxy modulus (Proxy::Proxy zq))
 
 tunnelAST (_::Proxy t) (x :: CTExpr (SHE.CT H0 ZP2 (Cyc t H0' ZQ5))) =
+  roundCTHelper (Proxy::Proxy ZQ5) $
   --tunnHelper (Proxy::Proxy '(H5,H5',ZQ6)) $
   --tunnHelper (Proxy::Proxy '(H4,H4',ZQ6)) $
   --tunnHelper (Proxy::Proxy '(H3,H3',ZQ6)) $
   --tunnHelper (Proxy::Proxy '(H2,H2',ZQ6)) $
-  tunnHelper (Proxy::Proxy '(H1,H1',ZQ6)) x
+  tunnHelper (Proxy::Proxy '(H1,H1')) $ 
+  roundCTHelper (Proxy::Proxy ZQ6) x
 
 prfTest pc@(_::Proxy t) = do
   -- public multiplier
@@ -119,11 +121,13 @@ prfTest pc@(_::Proxy t) = do
 
 homomPRF (_::Proxy t) c (x :: CTExpr (SHE.CT H0 ZP8 (Cyc t H0' ZQ4))) = 
   let scaledX = mulPublicCT c x
-      hopX = tunnHelper (Proxy::Proxy '(H5,H5',ZQ5)) $
-             tunnHelper (Proxy::Proxy '(H4,H4',ZQ5)) $
-             tunnHelper (Proxy::Proxy '(H3,H3',ZQ5)) $
-             tunnHelper (Proxy::Proxy '(H2,H2',ZQ5)) $
-             tunnHelper (Proxy::Proxy '(H1,H1',ZQ5)) $ scaledX
+      hopX = roundCTHelper (Proxy::Proxy ZQ4) $
+             tunnHelper (Proxy::Proxy '(H5,H5')) $
+             tunnHelper (Proxy::Proxy '(H4,H4')) $
+             tunnHelper (Proxy::Proxy '(H3,H3')) $
+             tunnHelper (Proxy::Proxy '(H2,H2')) $
+             tunnHelper (Proxy::Proxy '(H1,H1')) $ 
+             roundCTHelper (Proxy::Proxy ZQ5) scaledX
   in share hopX $ \y -> 
     let z0 = roundCTHelper (Proxy::Proxy ZQ3) y                    -- after hopping, round down to ZQ3
         z1 = z0 * (addPublicCT one z0)                             -- x*(x+1)
@@ -139,11 +143,11 @@ homomPRF (_::Proxy t) c (x :: CTExpr (SHE.CT H0 ZP8 (Cyc t H0' ZQ4))) =
 
 -- type restricted helpers
 
-tunnHelper :: forall dom gad c r r' s s' e e' z zp zq zq' .
-  (ASTTunnelCtx dom gad c r r' s s' e e' z zp zq zq',
+tunnHelper :: forall dom gad c r r' s s' e e' z zp zq .
+  (ASTTunnelCtx dom gad c r r' s s' e e' z zp zq,
    gad ~ TrivGad, dom ~ CTDOM)
-  => Proxy '(s,s',zq') -> CTExpr (SHE.CT r zp (Cyc c r' zq)) -> CTExpr (SHE.CT s zp (Cyc c s' zq))
-tunnHelper _ x = proxy (tunnDummy x) (Proxy::Proxy '(gad, zq'))
+  => Proxy '(s,s') -> CTExpr (SHE.CT r zp (Cyc c r' zq)) -> CTExpr (SHE.CT s zp (Cyc c s' zq))
+tunnHelper _ x = proxy (tunnDummy x) (Proxy::Proxy gad)
 
 roundCTHelper :: (ASTRoundCTCtx CTDOM c m m' zp zq zq') 
   => Proxy zq' -> CTExpr (SHE.CT m zp (Cyc c m' zq)) -> CTExpr (SHE.CT m zp (Cyc c m' zq'))

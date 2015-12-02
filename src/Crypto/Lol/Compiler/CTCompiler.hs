@@ -91,7 +91,7 @@ genKeys' v node (arg :* Nil)
   | Just (LamT v) <- prj node = return $ coerce $ getDecor arg
   | Just (KeySwQDummy _ _) <- prj node,
     (kid, 2) <- unKeyID $ getDecor arg = return $ ID (kid, 1)
-  | Just (TunnDummy _ _) <- prj node,
+  | Just (TunnDummy _) <- prj node,
     (_ :: sym (CT r zp (Cyc t r' zq) :-> Full (CT s zp (Cyc t s' zq)))) <- node = do
     kid <- lift $ genKeyIfNotExists (Proxy::Proxy (Cyc t s' (LiftOf zp))) v
     return $ ID (kid, 1)
@@ -172,10 +172,10 @@ getDecryptKey keyMap node =
 
 type HintEnv = Map ((KeyID, Int), (KeyID,Int)) Dynamic
 
-hintLookup :: (MonadState HintEnv m, Typeable gad, Typeable zq', 
+hintLookup :: (MonadState HintEnv m, Typeable gad, Typeable zq, 
                Typeable (CT r zp ((c :: Factored -> * -> *) r' zq)), Typeable (CT s zp (c s' zq))) 
   => (KeyID, Int) -> (KeyID, Int) 
-     -> m (Maybe (Tagged (gad,zq') (CT r zp (c r' zq) -> CT s zp (c s' zq))))
+     -> m (Maybe (Tagged gad (CT r zp (c r' zq) -> CT s zp (c s' zq))))
 hintLookup kids1 kids2 = liftM (fromDynamic <=< lookup (kids1, kids2)) get
 
 
@@ -201,12 +201,12 @@ genHints' keyMap (node :&: info) _
       return $ (inj $ KeySwQuad (proxy thint (Proxy::Proxy (gad,zq')))) :&: info
 -- this does not memoize the linear keys right now
 genHints' keyMap (node :&: info) (arg :* Nil)
-  | Just (TunnDummy (_::p0 gad) (_::p0 zq')) <- prj node,
+  | Just (TunnDummy (_::p0 gad)) <- prj node,
     (koutid, _) <- unKeyID info,
     (kinid, _) <- unKeyID $ getDecor arg,
     (_ :: sym (CT r zp (Cyc t r' zq) :-> Full (CT s zp (Cyc t s' zq)))) <- node = do
       thint <- maybeGenLinHint keyMap kinid koutid
-      return $ (inj $ CTRingTunn (proxy thint (Proxy::Proxy (gad,zq')))) :&: info
+      return $ (inj $ CTRingTunn (proxy thint (Proxy::Proxy gad))) :&: info
 genHints' _ node _ = return node
 
 
@@ -240,12 +240,12 @@ maybeGenQuadHint keyMap kid = do
       return h
 
 
-maybeGenLinHint :: forall mon gad zq' r s zp t r' s' zq z e e' . 
+maybeGenLinHint :: forall mon gad r s zp t r' s' zq z e e' . 
   (MonadState HintEnv mon,
    MonadRandom mon,
    z ~ LiftOf zp,
 
-   TunnelCtx t e r s e' r' s' z zp zq zq' gad,
+   TunnelCtx t e r s e' r' s' z zp zq gad,
    e ~ FGCD r s,
    ZPP zp,
    CElt t (ZPOf zp),
@@ -253,11 +253,11 @@ maybeGenLinHint :: forall mon gad zq' r s zp t r' s' zq z e e' .
    Typeable (Cyc t s' z),
    Typeable (CT r zp (Cyc t r' zq)), 
    Typeable (CT s zp (Cyc t s' zq)), 
-   Typeable gad, Typeable zq') 
+   Typeable gad, Typeable zq) 
   => Map KeyID Dynamic 
      -> KeyID
      -> KeyID
-     -> mon (Tagged (gad,zq') (CT r zp (Cyc t r' zq) -> CT s zp (Cyc t s' zq)))
+     -> mon (Tagged gad (CT r zp (Cyc t r' zq) -> CT s zp (Cyc t s' zq)))
 maybeGenLinHint keyMap kid1 kid2 = (do
   mhint <- hintLookup (kid1, 1) (kid2, 1) -- look for a linear hint for key with id kid
   case mhint of
@@ -363,7 +363,7 @@ instance (InferDoms sym, Typeable sym, Typeable sym', BUTCtx (CT m zp (Cyc t m' 
     | Just (KeySwQDummy _ _) <- prj node = oneArgBU f node arg
     | Just ModSwitchPT <- prj node = oneArgBU f node arg
     | Just ModSwitchCT <- prj node = oneArgBU f node arg
-    | Just (TunnDummy _ _) <- prj node = oneArgBU f node arg
+    | Just (TunnDummy _) <- prj node = oneArgBU f node arg
     | Just (AddPublic _) <- prj node = oneArgBU f node arg
     | Just (MulPublic _) <- prj node = oneArgBU f node arg
   bottomUpMapM'' f ((Sym node) :$ arg1 :$ arg2)
