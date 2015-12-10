@@ -191,4 +191,4 @@ executable ast
     type-natural,
     QuickCheck,
     containers,
-    syntactic
+    syntactic>=3.2

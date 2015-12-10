@@ -1,8 +1,8 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, PackageImports #-}
 
 module DRBG (CryptoRand) where
 
-import Crypto.Random
+import "crypto-api" Crypto.Random
 import Data.Binary.Get
 import Data.ByteString hiding (pack)
 import Data.ByteString.Lazy (pack)

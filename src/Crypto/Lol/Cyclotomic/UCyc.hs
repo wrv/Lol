@@ -269,7 +269,7 @@ instance (Decompose gad zq, Fact m,
   decompose (Sub c) = pasteT $ Sub <$> peelT (decompose c)
 
   -- traverse: Traversable (c m) and Applicative (Tagged gad ZL)
-  decompose x = fromZL $ traverse (toZL . decompose) $ forcePow x
+  decompose x = fromZL $ (traverse (toZL . decompose)) $ forcePow x
     where toZL :: Tagged s [a] -> TaggedT s ZipList a
           toZL = coerce
           fromZL :: TaggedT s ZipList a -> Tagged s [a]

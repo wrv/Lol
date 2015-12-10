@@ -1,6 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude, RebindableSyntax, DataKinds, TypeOperators, 
              KindSignatures, TypeFamilies, UndecidableInstances, 
-             FlexibleInstances, MultiParamTypeClasses,
+             FlexibleInstances, MultiParamTypeClasses, PackageImports,
              FlexibleContexts, ScopedTypeVariables, RankNTypes, PolyKinds,
              StandaloneDeriving, DeriveDataTypeable, ConstraintKinds #-}
 
@@ -8,9 +8,9 @@ import Crypto.Lol.Compiler.AST hiding (Sub)
 import Crypto.Lol.Compiler.CT
 import Crypto.Lol.Compiler.CTDummy
 import Crypto.Lol.Compiler.CTCompiler
-import Data.Syntactic.Sugar.BindingT () -- need for instance of Syntactic (a->b) when using `share` below
-import Data.Syntactic hiding (size)
-import Data.Syntactic.Functional (lamT, BindingT)
+import Language.Syntactic.Sugar.BindingTyped () -- need for instance of Syntactic (a->b) when using `share` below
+import Language.Syntactic hiding (size)
+import Language.Syntactic.Functional (lamTyped, BindingT)
 
 import Crypto.Lol as Lol
 import Crypto.Lol.Cyclotomic.UCyc
@@ -21,7 +21,7 @@ import DRBG
 import Types
 
 import Control.Monad.Random
-import Crypto.Random
+import "crypto-api" Crypto.Random
 import Crypto.Random.DRBG
 
 import Data.Foldable
@@ -29,7 +29,7 @@ import Data.Map as M hiding (replicate, size, map, toList, (\\))
 
 -- don't turn on -fbreak-on-exception unless you want to trace because it makes the error messages much worse!
 
-type CTDOM = (ADDITIVE :+: RING :+: CTOps :+: CTDummyOps :+: Literal :+: Let :+: BindingT)
+type CTDOM = Typed (ADDITIVE :+: RING :+: CTOps :+: CTDummyOps :+: Literal :+: Let :+: BindingT)
 type CTExpr a = ASTF CTDOM a
 
 main :: IO ()
@@ -58,7 +58,7 @@ tunnelTest pc@(_::Proxy t) = do -- in IO
     let v = 0.1 :: Double
     x'<- getRandom
 
-    ast0 <- time "Computing AST: " $ lamT $ tunnelAST pc
+    ast0 <- time "Computing AST: " $ lamTyped $ tunnelAST pc
 
     (ast1, idMap) <- time "Generating keys: " =<< 
       evalCryptoRandIO (genKeys v ast0)
@@ -104,7 +104,7 @@ prfTest pc@(_::Proxy t) = do
   let v = 0.1 :: Double
   x' <- getRandom
 
-  ast0 <- time "Computing AST: " $ lamT $ homomPRF pc c
+  ast0 <- time "Computing AST: " $ lamTyped $ homomPRF pc c
 
   (ast1, idMap) <- time "Generating keys: " =<< 
     evalCryptoRandIO (genKeys v ast0)
@@ -128,7 +128,7 @@ homomPRF (_::Proxy t) c (x :: CTExpr (SHE.CT H0 ZP8 (Cyc t H0' ZQ4))) =
              tunnHelper (Proxy::Proxy '(H2,H2')) $
              tunnHelper (Proxy::Proxy '(H1,H1')) $ 
              roundCTHelper (Proxy::Proxy ZQ5) scaledX
-  in share hopX $ \y -> 
+  in share hopX $ \y ->
     let z0 = roundCTHelper (Proxy::Proxy ZQ3) y                    -- after hopping, round down to ZQ3
         z1 = z0 * (addPublicCT one z0)                             -- x*(x+1)
         z2 = proxy (ksqDummy z1) (Proxy::Proxy '(TrivGad, ZQ4))    -- key switch z1 after product using bonus modulus ZQ4
@@ -143,16 +143,16 @@ homomPRF (_::Proxy t) c (x :: CTExpr (SHE.CT H0 ZP8 (Cyc t H0' ZQ4))) =
 
 -- type restricted helpers
 
-tunnHelper :: forall dom gad c r r' s s' e e' z zp zq .
-  (ASTTunnelCtx dom gad c r r' s s' e e' z zp zq,
+tunnHelper :: forall dom dom' gad c r r' s s' e e' z zp zq .
+  (ASTTunnelCtx dom dom' gad c r r' s s' e e' z zp zq,
    gad ~ TrivGad, dom ~ CTDOM)
   => Proxy '(s,s') -> CTExpr (SHE.CT r zp (Cyc c r' zq)) -> CTExpr (SHE.CT s zp (Cyc c s' zq))
 tunnHelper _ x = proxy (tunnDummy x) (Proxy::Proxy gad)
 
-roundCTHelper :: (ASTRoundCTCtx CTDOM c m m' zp zq zq') 
+roundCTHelper :: (ASTRoundCTCtx CTDOM dom' c m m' zp zq zq') 
   => Proxy zq' -> CTExpr (SHE.CT m zp (Cyc c m' zq)) -> CTExpr (SHE.CT m zp (Cyc c m' zq'))
 roundCTHelper _ x = roundCT x
 
-roundPTHelper :: (ASTRoundPTCtx CTDOM c m m' zp zp' zq) 
+roundPTHelper :: (ASTRoundPTCtx CTDOM dom' c m m' zp zp' zq) 
   => Proxy zp' -> CTExpr (SHE.CT m zp (Cyc c m' zq)) -> CTExpr (SHE.CT m zp' (Cyc c m' zq))
 roundPTHelper _ x = roundPT x

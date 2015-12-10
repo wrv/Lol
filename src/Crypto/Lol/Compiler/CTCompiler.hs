@@ -42,8 +42,8 @@ import Data.Constraint hiding (Sub)
 import Data.Dynamic
 import Data.Map as M (Map, lookup, empty, insert, elems, delete)
 import Data.Maybe
-import Data.Syntactic
-import Data.Syntactic.Functional
+import Language.Syntactic
+import Language.Syntactic.Functional hiding (Let)
 
 -- this module passes over an AST and decorates 
 -- it with abstract key IDs representing the
@@ -52,6 +52,8 @@ import Data.Syntactic.Functional
 -- decoration wrappers
 
 newtype IDDecor a = ID {unKeyID :: (KeyID, Int)} deriving (Typeable)
+instance NFData1 IDDecor where
+  rnf1 (ID p) = rnf p
 
 type InferDoms sym = (
   CTDummyOps :<: sym, CTOps :<: sym, RING :<: sym, 
@@ -60,27 +62,25 @@ type InferDoms sym = (
 showIDDecor :: IDDecor a -> String
 showIDDecor (ID a) = show a
 
-
-
 -- | Decorates AST nodes with a (KeyID,Int) where the KeyID maps to the dynamic key that decrypts that node 
 -- and the Int is degree of the ciphertext in the key
 -- Fails if KeySwQDummy nodes don't have degree 2, and assumes that all VarT nodes have degree 1
 
 genKeys :: (InferDoms sym, ToRational v, NFData v, MonadRandom mon,
-            Typeable sym, BUT sym (sym :&: IDDecor) a) 
-  => v -> ASTF sym a -> mon (ASTF (sym :&: IDDecor) a, Map TypeRep (Int,Dynamic))
+            Typeable sym, BUT (Typed sym) (Typed sym :&: IDDecor) a)
+  => v -> ASTF (Typed sym) a -> mon (ASTF (Typed sym :&: IDDecor) a, Map TypeRep (Int,Dynamic))
 genKeys v ast = flip runStateT (M.empty :: Map TypeRep (Int,Dynamic)) (bottomUpMapMCT (genKeysWrapper v) ast)
 
 genKeysWrapper :: (InferDoms sym, ToRational v, NFData v, MonadRandom mon, Typeable sym,
   MonadState (Map TypeRep (Int, Dynamic)) mon)
-  => v -> sym sig -> Args (AST (sym :&: IDDecor)) sig -> StateT Env mon (ASTF (sym :&: IDDecor) (DenResult sig))
+  => v -> (Typed sym) sig -> Args (AST (Typed sym :&: IDDecor)) sig -> StateT Env mon (ASTF (Typed sym :&: IDDecor) (DenResult sig))
 genKeysWrapper v node args = do
   info <- genKeys' v node args
   return $ appArgs (Sym (node :&: info)) args
 
 genKeys' :: forall sym v mon sig . (InferDoms sym, ToRational v, NFData v, MonadRandom mon, Typeable sym,
   MonadState (Map TypeRep (Int, Dynamic)) mon)
-  => v -> sym sig -> Args (AST (sym :&: IDDecor)) sig -> StateT Env mon (IDDecor (DenResult sig))
+  => v -> (Typed sym) sig -> Args (AST ((Typed sym) :&: IDDecor)) sig -> StateT Env mon (IDDecor (DenResult sig))
 genKeys' v node (arg1 :* arg2 :* Nil)
   | Just Mul <- prj node,
     (kid1, p1) <- unKeyID $ getDecor arg1,
@@ -92,7 +92,7 @@ genKeys' v node (arg :* Nil)
   | Just (KeySwQDummy _ _) <- prj node,
     (kid, 2) <- unKeyID $ getDecor arg = return $ ID (kid, 1)
   | Just (TunnDummy _) <- prj node,
-    (_ :: sym (CT r zp (Cyc t r' zq) :-> Full (CT s zp (Cyc t s' zq)))) <- node = do
+    (_ :: (Typed sym) (CT r zp (Cyc t r' zq) :-> Full (CT s zp (Cyc t s' zq)))) <- node = do
     kid <- lift $ genKeyIfNotExists (Proxy::Proxy (Cyc t s' (LiftOf zp))) v
     return $ ID (kid, 1)
 genKeys' v node Nil
@@ -183,30 +183,30 @@ hintLookup kids1 kids2 = liftM (fromDynamic <=< lookup (kids1, kids2)) get
 -- nodes to evaulatable CT nodes.
 genHints :: forall v sym a m . 
   (CTOps :<: sym, MonadRandom m, CTDummyOps :<: sym) 
-  => Map KeyID Dynamic -> ASTF (sym :&: IDDecor) a -> m (ASTF (sym :&: IDDecor) a)
+  => Map KeyID Dynamic -> ASTF (Typed sym :&: IDDecor) a -> m (ASTF (Typed sym :&: IDDecor) a)
 genHints keyMap = flip evalStateT (M.empty :: HintEnv) . bottomUpMapM (genHints' keyMap) 
 
 genHints' :: 
   (CTDummyOps :<: sym, CTOps :<: sym,
    MonadRandom mon, MonadState HintEnv mon)
   => Map KeyID Dynamic
-     -> (sym :&: IDDecor) sig 
-     -> Args (AST (sym :&: IDDecor)) sig 
-     -> mon ((sym :&: IDDecor) sig)
+     -> (Typed sym :&: IDDecor) sig 
+     -> Args (AST (Typed sym :&: IDDecor)) sig 
+     -> mon ((Typed sym :&: IDDecor) sig)
 genHints' keyMap (node :&: info) _
   | Just (KeySwQDummy (_ :: p gad) (_ :: p zq')) <- prj node,
     (kid, _) <- unKeyID info,
-    (_ :: sym (CT m zp (Cyc t m' zq) :-> Full (CT m zp (Cyc t m' zq)))) <- node = do
+    (_ :: (Typed sym) (CT m zp (Cyc t m' zq) :-> Full (CT m zp (Cyc t m' zq)))) <- node = do
       thint <- maybeGenQuadHint keyMap kid
-      return $ (inj $ KeySwQuad (proxy thint (Proxy::Proxy (gad,zq')))) :&: info
+      return $ (Typed $ inj $ KeySwQuad (proxy thint (Proxy::Proxy (gad,zq')))) :&: info
 -- this does not memoize the linear keys right now
 genHints' keyMap (node :&: info) (arg :* Nil)
   | Just (TunnDummy (_::p0 gad)) <- prj node,
     (koutid, _) <- unKeyID info,
     (kinid, _) <- unKeyID $ getDecor arg,
-    (_ :: sym (CT r zp (Cyc t r' zq) :-> Full (CT s zp (Cyc t s' zq)))) <- node = do
+    (_ :: (Typed sym) (CT r zp (Cyc t r' zq) :-> Full (CT s zp (Cyc t s' zq)))) <- node = do
       thint <- maybeGenLinHint keyMap kinid koutid
-      return $ (inj $ CTRingTunn (proxy thint (Proxy::Proxy gad))) :&: info
+      return $ (Typed $ inj $ CTRingTunn (proxy thint (Proxy::Proxy gad))) :&: info
 genHints' _ node _ = return node
 
 
@@ -352,7 +352,11 @@ class (BUTCtx a) => BUT sym sym' a where
      -> ASTF sym a
      -> m (ASTF sym' a)
 
-instance (InferDoms sym, Typeable sym, Typeable sym', BUTCtx (CT m zp (Cyc t m' zq))) 
+type family UnType dom where
+  UnType (dom :&: info) = (UnType dom) :&: info
+  UnType (Typed dom) = dom
+
+instance (InferDoms (UnType sym), Typeable sym, Typeable sym', BUTCtx (CT m zp (Cyc t m' zq))) 
   => BUT sym sym' (CT m zp (Cyc t m' zq)) where
 
   type BUTCtx (CT m zp (Cyc t m' zq)) = 
@@ -366,6 +370,7 @@ instance (InferDoms sym, Typeable sym, Typeable sym', BUTCtx (CT m zp (Cyc t m' 
     | Just (TunnDummy _) <- prj node = oneArgBU f node arg
     | Just (AddPublic _) <- prj node = oneArgBU f node arg
     | Just (MulPublic _) <- prj node = oneArgBU f node arg
+{-
   bottomUpMapM'' f ((Sym node) :$ arg1 :$ arg2)
     | Just Add <- prj node = twoArgBU f node arg1 arg2
     | Just Sub <- prj node = twoArgBU f node arg1 arg2
@@ -401,8 +406,8 @@ instance (InferDoms sym, Typeable sym, Typeable sym', BUTCtx (CT m zp (Cyc t m' 
            modify $ delete v
            bind' <- bottomUpMapM'' f bind
            f node (bind' :* lam' :* Nil)
-
-instance (InferDoms sym, Typeable sym, Typeable sym', BUT sym sym' b) 
+-}
+instance (InferDoms (UnType sym), Typeable sym, Typeable sym', BUT sym sym' b) 
   => BUT sym sym' (a -> b) where
 
   type BUTCtx (a -> b) = BUTCtx b

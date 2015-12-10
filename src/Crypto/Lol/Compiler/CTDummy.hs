@@ -26,8 +26,8 @@ import Crypto.Lol.LatticePrelude hiding (lookup)
 import Crypto.Lol.Applications.SymmSHE
 
 import Data.Dynamic
-import Data.Syntactic
-import Data.Syntactic.Functional
+import Language.Syntactic
+import Language.Syntactic.Functional hiding (Let)
 
 type KSDummyCtx z gad zq' m zp c m' zq = 
   (Fact m, Fact m',
@@ -61,10 +61,11 @@ data CTDummyOps :: (* -> *) where
 instance StringTree CTDummyOps
 instance EvalEnv CTDummyOps env
 
-instance Symbol CTDummyOps where
-  rnfSym (KeySwQDummy _ _) = ()
-  rnfSym (TunnDummy _) = ()
+instance NFData1 CTDummyOps where
+  rnf1 (KeySwQDummy _ _) = ()
+  rnf1 (TunnDummy _) = ()
 
+instance Symbol CTDummyOps where
   symSig (KeySwQDummy _ _) = signature
   symSig (TunnDummy _) = signature
 
@@ -76,17 +77,17 @@ instance Render CTDummyOps where
 instance Eval CTDummyOps where
   evalSym = error "cannot evaluate CTDummyOps nodes!"
 
-ksqDummy :: forall dom gad c m m' z zp zq zq' . 
-  (CTDummyOps :<: dom, KSDummyCtx z gad zq' m zp c m' zq)
+ksqDummy :: forall dom dom' gad c m m' z zp zq zq' . 
+  (CTDummyOps :<: dom', dom ~ Typed dom', KSDummyCtx z gad zq' m zp c m' zq)
   => ASTF dom (CT m zp (Cyc c m' zq)) -> Tagged '(gad, zq') (ASTF dom (CT m zp (Cyc c m' zq)))
-ksqDummy = return . (inj (KeySwQDummy (Proxy::Proxy gad) (Proxy::Proxy zq')) :$)
+ksqDummy = return . (injT (KeySwQDummy (Proxy::Proxy gad) (Proxy::Proxy zq')) :$)
 
-type ASTTunnelCtx dom gad c r r' s s' e e' z zp zq =
-  (CTDummyOps :<: dom, TunnelCtx c e r s e' r' s' z zp zq gad, e ~ FGCD r s, 
+type ASTTunnelCtx dom dom' gad c r r' s s' e e' z zp zq =
+  (CTDummyOps :<: dom', dom ~ Typed dom', TunnelCtx c e r s e' r' s' z zp zq gad, e ~ FGCD r s, 
    Fact r, Typeable c, Typeable r', Typeable s', Typeable z, Typeable s, Typeable r,
    Typeable gad, Typeable zq, Typeable zp, CElt c (ZPOf zp), ZPP zp)
 
-tunnDummy :: forall dom gad c r r' s s' e e' z zp zq . 
-  (ASTTunnelCtx dom gad c r r' s s' e e' z zp zq)
+tunnDummy :: forall dom dom' gad c r r' s s' e e' z zp zq . 
+  (ASTTunnelCtx dom dom' gad c r r' s s' e e' z zp zq)
   => ASTF dom (CT r zp (Cyc c r' zq)) -> Tagged gad (ASTF dom (CT s zp (Cyc c s' zq)))
-tunnDummy = return . (inj (TunnDummy (Proxy::Proxy gad)) :$)
+tunnDummy = return . (injT (TunnDummy (Proxy::Proxy gad)) :$)

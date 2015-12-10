@@ -24,10 +24,13 @@ import Control.Monad.State
 
 import Crypto.Lol.LatticePrelude hiding ((!!), lookup, lift)
 
-import Data.Syntactic
-import Data.Syntactic.Functional
+import Language.Syntactic
+import Language.Syntactic.Functional hiding (Let, Literal)
 import Data.Tree
 import Data.Typeable
+
+instance (NFData1 sym) => NFData1 (Typed sym) where
+  rnf1 (Typed x) = rnf1 x
 
 -- Some generic AST functions
 -- useful default instances
@@ -48,9 +51,11 @@ data Literal a where
 instance StringTree Literal -- uses default implementation
 instance EvalEnv Literal env
 
+instance NFData1 Literal where
+  rnf1 (IntLit i) = rnf i
+  rnf1 (Const i) = rnf i
+
 instance Symbol Literal where
-  rnfSym (IntLit i) = rnf i
-  rnfSym (Const a) = rnf a
   symSig (IntLit _) = signature
   symSig (Const _) = signature
 
@@ -76,9 +81,9 @@ data ADDITIVE a where
 
 instance StringTree ADDITIVE
 instance EvalEnv ADDITIVE env
+instance NFData1 ADDITIVE -- rnf is default
 
 instance Symbol ADDITIVE where
-  -- rnf is default
   symSig Add = signature
   symSig Sub = signature
 
@@ -90,11 +95,11 @@ instance Eval ADDITIVE where
   evalSym Add = (+)
   evalSym Sub = (-)
 
-instance (Literal :<: dom, Ring a, ADDITIVE :<: dom, Show  a) 
-  => Additive.C (AST dom (Full a)) where
-  zero = sugarSym $ IntLit (zero :: Integer)
-  (+) = sugarSym Add
-  (-)= sugarSym Sub
+instance (Literal :<: dom, Ring a, ADDITIVE :<: dom, Show  a, Typeable a) 
+  => Additive.C (AST (Typed dom) (Full a)) where
+  zero = sugarSymTyped $ IntLit (zero :: Integer)
+  (+) = sugarSymTyped Add
+  (-)= sugarSymTyped Sub
 
 -- | deep embedding for ring multiplication
 data RING :: (* -> *) where
@@ -103,6 +108,7 @@ data RING :: (* -> *) where
 
 instance StringTree RING
 instance EvalEnv RING env
+instance NFData1 RING -- rnf1 is default
 
 instance Symbol RING where
   symSig Mul = signature
@@ -114,15 +120,15 @@ instance Eval RING where
   evalSym Mul = (*)
 
 instance (Literal :<: dom, RING :<: dom,
-          ADDITIVE :<: dom, Ring a, Show a) 
-  => Ring.C (AST dom (Full a)) where
-    one = sugarSym $ IntLit (one :: Integer)
-    (*) = sugarSym Mul
-    fromInteger = sugarSym . IntLit
+          ADDITIVE :<: dom, Ring a, Show a, Typeable a) 
+  => Ring.C (AST (Typed dom) (Full a)) where
+    one = sugarSymTyped $ IntLit (one :: Integer)
+    (*) = sugarSymTyped Mul
+    fromInteger = sugarSymTyped . IntLit
 
 -- | deep embedding for sharing computation in an AST
 data Let :: (* -> *) where
-  Let :: (Typeable a) => Let (a :-> (a -> b) :-> Full b)
+  Let :: Let (a :-> (a -> b) :-> Full b)
   deriving (Typeable)
 
 instance Render Let where
@@ -137,19 +143,22 @@ instance Eval Let where
   evalSym Let = flip ($)
 
 instance EvalEnv Let env
+instance NFData1 Let -- rnf1 is default
 
 instance Symbol Let where
   symSig Let = signature
 
 -- | shallow embedding for sharing computation in an AST
-share :: (Let :<: sup, sup ~ Domain (a -> b), 
-          sup ~ Domain b, sup ~ Domain a, 
-          Internal (a -> b) ~ (Internal a -> Internal b),
-          Syntactic a, Syntactic b,
-          Syntactic (a -> b), Typeable (Internal a),
+share :: (Let :<: sup,
+          Syntactic (a -> b),
+          sig ~ (Internal a :-> (Internal a -> Internal b) :-> Full (Internal b)),
+          fi ~ SmartFun (Typed sup) sig,
+          sig ~ SmartSig fi,
+          Typed sup ~ SmartSym fi,
+          Typeable (DenResult sig),
           SyntacticN (a -> (a -> b) -> b) fi) -- requires AllowAmbiguousTypes
       => a -> (a -> b) -> b
-share = sugarSym Let
+share = sugarSymTyped Let
 
 -- | useful traversals and helper functions
 bottomUpMapM :: forall sym sym' a m .
