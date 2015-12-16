@@ -4,9 +4,10 @@
              RankNTypes, RebindableSyntax, ScopedTypeVariables,
              TypeFamilies, TypeOperators, UndecidableInstances #-}
 
--- | An implementation of cyclotomic rings.  WARNING: this module
--- provides an experts-only, "unsafe" interface that may result in
--- runtime errors if not used correctly!
+-- | An implementation of cyclotomic rings.
+
+-- | __WARNING:__ this module provides an experts-only, "unsafe"
+-- interface that may result in runtime errors if not used correctly!
 -- 'Crypto.Lol.Cyclotomic.Cyc.Cyc' provides a safe interface, and
 -- should be used in applications whenever possible.
 --
@@ -20,10 +21,17 @@
 -- work over the element's /current/ @r@-basis representation (or
 -- 'pure' scalar representation as a special case, to satisfy the
 -- 'Applicative' laws), and the output remains in that representation.
--- If the input's representation is not one of these, the behavior is
+-- If the input's representation is not one of these, the result is
 -- a runtime error.  To ensure a valid representation when using the
 -- methods from these classes, first call 'forceBasis' or one of its
 -- specializations ('forcePow', 'forceDec', 'forceAny').
+--
+-- | __WARNING:__ as with all fixed-point arithmetic, the functions
+-- associated with 'UCyc' may result in overflow (and thereby
+-- incorrect answers and potential security flaws) if the input
+-- arguments are too close to the bounds imposed by the base type.
+-- The acceptable range of inputs for each function is determined by
+-- the internal linear transforms and other operations it performs.
 
 module Crypto.Lol.Cyclotomic.UCyc
 (
@@ -57,6 +65,7 @@ import Algebra.Ring         as Ring (C)
 import Algebra.ZeroTestable as ZeroTestable (C)
 
 import Control.Applicative
+import Control.Arrow
 import Control.DeepSeq
 import Control.Monad.Identity
 import Control.Monad.Random
@@ -268,18 +277,29 @@ instance (Decompose gad zq, Fact m,
   decompose (Scalar c) = pasteT $ Scalar <$> peelT (decompose c)
   decompose (Sub c) = pasteT $ Sub <$> peelT (decompose c)
 
-  -- traverse: Traversable (c m) and Applicative (Tagged gad ZL)
-  decompose x = fromZL $ (traverse (toZL . decompose)) $ forcePow x
-    where toZL :: Tagged s [a] -> TaggedT s ZipList a
-          toZL = coerce
-          fromZL :: TaggedT s ZipList a -> Tagged s [a]
-          fromZL = coerce
+  -- traverse: Traversable (UCyc t m) and Applicative (Tagged gad ZL)
+  decompose x = fromZL $ traverse (toZL . decompose) $ forcePow x
+
+toZL :: Tagged s [a] -> TaggedT s ZipList a
+toZL = coerce
+
+fromZL :: TaggedT s ZipList a -> Tagged s [a]
+fromZL = coerce
+
+unzipCyc :: (Tensor t, Fact m) => UCyc t m (a,b) -> (UCyc t m a, UCyc t m b)
+unzipCyc (Pow v) = Pow *** Pow $ unzipT v
+unzipCyc (Dec v) = Dec *** Dec $ unzipT v
+unzipCyc (CRTr v) = CRTr *** CRTr $ unzipT v
+unzipCyc (CRTe v) = CRTe *** CRTe $ unzipT v
+unzipCyc (Scalar (a,b)) = (Scalar a, Scalar b)
+unzipCyc (Sub c) = Sub *** Sub $ unzipCyc c
 
 -- promote Correct, using the decoding basis
-instance (Correct gad zq, Fact m, CElt t zq)
-         => Correct gad (UCyc t m zq) where
-  -- sequenceA: Applicative (c m) and Traversable (TaggedT [])
-  correct bs = (correct . pasteT) <$> sequenceA (forceDec <$> peelT bs)
+instance (Correct gad zq, Fact m, CElt t zq) => Correct gad (UCyc t m zq) where
+  -- sequence: Monad [] and Traversable (UCyc t m)
+  -- sequenceA: Applicative (UCyc t m) and Traversable (TaggedT gad [])
+  correct bs = second sequence $ unzipCyc $ (correct . pasteT) <$> 
+               sequenceA (forceDec <$> peelT bs)
 
 -- generic RescaleCyc instance
 
@@ -308,14 +328,12 @@ instance (Mod a, Field b, Lift a (ModRep a), Reduce (LiftOf a) b,
 
   rescaleCyc bas x =
     let aval = proxy modulus (Proxy::Proxy a)
-  -- CJP: could use unzipC here to get (a,b) in one pass, but it
-  -- requires adding that method, and unzipT to Tensor and all its
-  -- instances. Probably not worth it.
         y = forceAny x
-        a = fmapC fst y
-        b = fmapC snd y
+        (a,b) = unzipCyc y
         z = liftCyc bas a
     in Scalar (recip (reduce aval)) * (b - reduce z)
+
+type instance LiftOf (UCyc t m r) = UCyc t m (LiftOf r)
 
 -- | Same as 'Crypto.Lol.Cyclotomic.Cyc.liftCyc', but for 'UCyc'.
 liftCyc :: (Lift b a, Fact m, CElt t a, CElt t b)

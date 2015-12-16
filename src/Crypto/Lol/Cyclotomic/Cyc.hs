@@ -7,9 +7,19 @@
 -- | An implementation of cyclotomic rings with safe interface:
 -- functions and instances involving 'Cyc' expose nothing about the
 -- internal representations of ring elements (e.g., the basis they are
--- represented in).  For an experts-only, "unsafe" implementation that
+-- represented in), nor can they result in runtime errors (assuming
+-- the component types satisfy their contracts).
+--
+-- For an experts-only, "unsafe" implementation that
 -- offers limited exposure of internal representation, use
 -- 'Crypto.Lol.Cyclotomic.UCyc.UCyc'.
+--
+-- | __WARNING:__ as with all fixed-point arithmetic, the functions
+-- associated with 'Cyc' may result in overflow (and thereby
+-- incorrect answers and potential security flaws) if the input
+-- arguments are too close to the bounds imposed by the base type.
+-- The acceptable range of inputs for each function is determined by
+-- the internal linear transforms and other operations it performs.
 
 module Crypto.Lol.Cyclotomic.Cyc
 ( 
@@ -171,6 +181,8 @@ powBasis = coerceCyc U.powBasis
 crtSet :: (m `Divides` m', ZPP r, CElt t r, CElt t (ZPOf r))
           => Tagged m [Cyc t m' r]
 crtSet = coerceCyc U.crtSet
+
+type instance LiftOf (Cyc t m r) = Cyc t m (LiftOf r)
 
 -- | Lift in the specified basis.
 liftCyc :: (Lift b a, Fact m, CElt t a, CElt t b)
