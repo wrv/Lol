@@ -2,7 +2,7 @@
              KindSignatures, TypeFamilies, UndecidableInstances, 
              FlexibleInstances, MultiParamTypeClasses, PackageImports,
              FlexibleContexts, ScopedTypeVariables, RankNTypes, PolyKinds,
-             StandaloneDeriving, DeriveDataTypeable, ConstraintKinds #-}
+             StandaloneDeriving, DeriveDataTypeable, ConstraintKinds, TypeSynonymInstances #-}
 
 import Crypto.Lol.Compiler.AST hiding (Sub)
 import Crypto.Lol.Compiler.CT
@@ -12,13 +12,16 @@ import Language.Syntactic.Sugar.BindingTyped () -- need for instance of Syntacti
 import Language.Syntactic hiding (size)
 import Language.Syntactic.Functional (lamTyped, BindingT)
 
-import Crypto.Lol as Lol
+import Crypto.Lol as Lol hiding ((**))
 import Crypto.Lol.Cyclotomic.UCyc
 import Crypto.Lol.Applications.SymmSHE hiding (CT)
 import qualified Crypto.Lol.Applications.SymmSHE as SHE
 
 import DRBG
 import Types
+
+import Data.Type.List
+import Data.Typeable
 
 import Control.Monad.Random
 import "crypto-api" Crypto.Random
@@ -90,13 +93,13 @@ errRatio ct sk =
   (fromIntegral $ proxy modulus (Proxy::Proxy zq))
 
 tunnelAST (_::Proxy t) (x :: CTExpr (SHE.CT H0 ZP2 (Cyc t H0' ZQ5))) =
-  roundCTHelper (Proxy::Proxy ZQ5) $
+  roundCTDown $
   --tunnHelper (Proxy::Proxy '(H5,H5',ZQ6)) $
   --tunnHelper (Proxy::Proxy '(H4,H4',ZQ6)) $
   --tunnHelper (Proxy::Proxy '(H3,H3',ZQ6)) $
   --tunnHelper (Proxy::Proxy '(H2,H2',ZQ6)) $
   tunnHelper (Proxy::Proxy '(H1,H1')) $ 
-  roundCTHelper (Proxy::Proxy ZQ6) x
+  roundCTUp x
 
 prfTest pc@(_::Proxy t) = do
   -- public multiplier
@@ -104,7 +107,7 @@ prfTest pc@(_::Proxy t) = do
   let v = 0.1 :: Double
   x' <- getRandom
 
-  ast0 <- time "Computing AST: " $ lamTyped $ homomPRF pc c
+  ast0 <- time "Computing AST: " $ lamTyped $ homomPRF c
 
   (ast1, idMap) <- time "Generating keys: " =<< 
     evalCryptoRandIO (genKeys v ast0)
@@ -119,29 +122,33 @@ prfTest pc@(_::Proxy t) = do
   
   putStrLn "Done!"
 
-homomPRF (_::Proxy t) c (x :: CTExpr (SHE.CT H0 ZP8 (Cyc t H0' ZQ4))) = 
+homomPRF c (x :: CTExpr (SHE.CT H0 ZP8 (Cyc t H0' ZQ4))) = 
   let scaledX = mulPublicCT c x
-      hopX = roundCTHelper (Proxy::Proxy ZQ4) $
+      hopX = roundCTDown $  -- after hopping, round down to ZQ3
+             roundCTDown $  -- return to input CT modulus
              tunnHelper (Proxy::Proxy '(H5,H5')) $
              tunnHelper (Proxy::Proxy '(H4,H4')) $
              tunnHelper (Proxy::Proxy '(H3,H3')) $
              tunnHelper (Proxy::Proxy '(H2,H2')) $
              tunnHelper (Proxy::Proxy '(H1,H1')) $ 
-             roundCTHelper (Proxy::Proxy ZQ5) scaledX
+             roundCTUp scaledX -- scale up modulus for applying hints
   in share hopX $ \y ->
-    let z0 = roundCTHelper (Proxy::Proxy ZQ3) y                    -- after hopping, round down to ZQ3
-        z1 = z0 * (addPublicCT one z0)                             -- x*(x+1)
-        z2 = proxy (ksqDummy z1) (Proxy::Proxy '(TrivGad, ZQ4))    -- key switch z1 after product using bonus modulus ZQ4
-        z3 = roundCTHelper (Proxy::Proxy ZQ2) z2                   -- mod switch z2 after product to ZQ2
-        w = roundPTHelper (Proxy::Proxy ZP4) z3                    -- round PT to ZP4
-    in share w $ \w' ->                                            -- w/w' has PT ZP4 and CT ZQ2
-      let u = (w' * (addPublicCT (-one) w'))                       -- u = w*(w-1)
-          u' = roundCTHelper (Proxy::Proxy ZQ1) $ 
-                 proxy (ksqDummy u) (Proxy::Proxy '(TrivGad, ZQ3)) -- key switch with bonus modulus ZQ3, the mod switch to ZQ1
-      in roundPTHelper (Proxy::Proxy ZP2) u'                       -- round the PT to ZP2 and return
-
+    let z = y ** (addPublicCT one y)          -- x*(x+1)
+        w = roundPTDown z                     -- round PT to ZP4
+    in share w $ \w' ->                       -- w/w' has PT ZP4 and CT ZQ2
+      let u = w' ** (addPublicCT (-one) w')   -- u = w*(w-1)
+      in roundPTDown u                        -- round the PT to ZP2 and return
 
 -- type restricted helpers
+
+a ** b =
+  let c = a*b
+      c' = ksqHelper c
+  in roundCTDown c'
+
+ksqHelper :: forall m zp c m' zq z . (KSDummyCtx z TrivGad (ZQUp zq) m zp c m' zq)
+  => CTExpr (SHE.CT m zp (Cyc c m' zq)) -> CTExpr (SHE.CT m zp (Cyc c m' zq))
+ksqHelper u = proxy (ksqDummy u) (Proxy::Proxy '(TrivGad, ZQUp zq))
 
 tunnHelper :: forall dom dom' gad c r r' s s' e e' z zp zq .
   (ASTTunnelCtx dom dom' gad c r r' s s' e e' z zp zq,
@@ -149,10 +156,30 @@ tunnHelper :: forall dom dom' gad c r r' s s' e e' z zp zq .
   => Proxy '(s,s') -> CTExpr (SHE.CT r zp (Cyc c r' zq)) -> CTExpr (SHE.CT s zp (Cyc c s' zq))
 tunnHelper _ x = proxy (tunnDummy x) (Proxy::Proxy gad)
 
-roundCTHelper :: (ASTRoundCTCtx CTDOM dom' c m m' zp zq zq') 
-  => Proxy zq' -> CTExpr (SHE.CT m zp (Cyc c m' zq)) -> CTExpr (SHE.CT m zp (Cyc c m' zq'))
-roundCTHelper _ x = roundCT x
+roundCTUp :: (ASTRoundCTCtx CTDOM dom' c m m' zp zq (ZQUp zq)) 
+  => CTExpr (SHE.CT m zp (Cyc c m' zq)) -> CTExpr (SHE.CT m zp (Cyc c m' (ZQUp zq)))
+roundCTUp x = roundCT x
 
-roundPTHelper :: (ASTRoundPTCtx CTDOM dom' c m m' zp zp' zq) 
-  => Proxy zp' -> CTExpr (SHE.CT m zp (Cyc c m' zq)) -> CTExpr (SHE.CT m zp' (Cyc c m' zq))
-roundPTHelper _ x = roundPT x
+roundCTDown :: (ASTRoundCTCtx CTDOM dom' c m m' zp zq (ZQDown zq))
+  => CTExpr (SHE.CT m zp (Cyc c m' zq)) -> CTExpr (SHE.CT m zp (Cyc c m' (ZQDown zq)))
+roundCTDown x = roundCT x
+
+roundPTDown :: (ASTRoundPTCtx CTDOM dom' c m m' zp (ZPDiv2 zp) zq) 
+  => CTExpr (SHE.CT m zp (Cyc c m' zq)) -> CTExpr (SHE.CT m (ZPDiv2 zp) (Cyc c m' zq))
+roundPTDown x = roundPT x
+
+type ZPDiv2 zp = NextListElt zp '[ZP8, ZP4, ZP2]
+type ZQSeq = '[ZQ6, ZQ5, ZQ4, ZQ3, ZQ2, ZQ1]
+type ZQUp zq = PrevListElt zq ZQSeq
+type ZQDown zq = NextListElt zq ZQSeq
+
+type family ZQRoundDown zq where
+  ZQRoundDown ZQ4 = ZQ3
+  ZQRoundDown ZQ3 = ZQ2
+  ZQRoundDown ZQ2 = ZQ1
+
+type family NextListElt x xs where
+  NextListElt x (x ': y ': ys) = y
+  NextListElt x (y ': ys) = NextListElt x ys
+
+type PrevListElt x xs = NextListElt x (Reverse xs)

@@ -13,8 +13,9 @@
 module Crypto.Lol.Compiler.CTDummy 
 (CTDummyOps(..)
 ,tunnDummy
-,ksqDummy,
-ASTTunnelCtx) where
+,ksqDummy
+,ASTTunnelCtx
+,KSDummyCtx) where
 
 
 import Control.DeepSeq
