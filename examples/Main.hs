@@ -1,8 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude, RebindableSyntax, DataKinds, TypeOperators, 
-             KindSignatures, TypeFamilies, UndecidableInstances, 
+             KindSignatures, TypeFamilies, UndecidableInstances, PartialTypeSignatures,
              FlexibleInstances, MultiParamTypeClasses, PackageImports,
              FlexibleContexts, ScopedTypeVariables, RankNTypes, PolyKinds,
-             StandaloneDeriving, DeriveDataTypeable, ConstraintKinds, TypeSynonymInstances #-}
+             StandaloneDeriving, ConstraintKinds, TypeSynonymInstances #-}
 
 import Crypto.Lol.Compiler.AST hiding (Sub)
 import Crypto.Lol.Compiler.CT
@@ -20,7 +20,7 @@ import qualified Crypto.Lol.Applications.SymmSHE as SHE
 import DRBG
 import Types
 
-import Data.Type.List
+import Data.Promotion.Prelude.List
 import Data.Typeable
 
 import Control.Monad.Random
@@ -103,7 +103,7 @@ tunnelAST (_::Proxy t) (x :: CTExpr (SHE.CT H0 ZP2 (Cyc t H0' ZQ5))) =
 
 prfTest pc@(_::Proxy t) = do
   -- public multiplier
-  c :: Cyc t H0 ZP8 <- getRandom
+  c <- getRandom
   let v = 0.1 :: Double
   x' <- getRandom
 
@@ -115,23 +115,16 @@ prfTest pc@(_::Proxy t) = do
   ast2 <- time "Generating hints: " =<< 
     evalCryptoRandIO (genHints (M.fromList $ elems idMap) ast1)
 
-  (x,_) <- time "Encrypting input: " =<< 
+  (x :: SHE.CT H0 ZP8 (Cyc t H0' ZQ4),_) <- time "Encrypting input: " =<< 
     evalCryptoRandIO (encryptInput idMap x')
 
   _ <- time "Evaluating AST: " $ eval ast2 x
   
   putStrLn "Done!"
 
-homomPRF c (x :: CTExpr (SHE.CT H0 ZP8 (Cyc t H0' ZQ4))) = 
+homomPRF c x = -- (x :: CTExpr (SHE.CT H0 _ (Cyc _ H0' _))) = 
   let scaledX = mulPublicCT c x
-      hopX = roundCTDown $  -- after hopping, round down to ZQ3
-             roundCTDown $  -- return to input CT modulus
-             tunnHelper (Proxy::Proxy '(H5,H5')) $
-             tunnHelper (Proxy::Proxy '(H4,H4')) $
-             tunnHelper (Proxy::Proxy '(H3,H3')) $
-             tunnHelper (Proxy::Proxy '(H2,H2')) $
-             tunnHelper (Proxy::Proxy '(H1,H1')) $ 
-             roundCTUp scaledX -- scale up modulus for applying hints
+      hopX = tunnel (Proxy::Proxy '[ '(H0,H0'), '(H1,H1'), '(H2,H2'), '(H3,H3'), '(H4,H4'), '(H5,H5') ]) scaledX -- scale up modulus for applying hints
   in share hopX $ \y ->
     let z = y ** (addPublicCT one y)          -- x*(x+1)
         w = roundPTDown z                     -- round PT to ZP4
@@ -141,6 +134,12 @@ homomPRF c (x :: CTExpr (SHE.CT H0 ZP8 (Cyc t H0' ZQ4))) =
 
 -- type restricted helpers
 
+(**) :: (Ring (CTExpr (SHE.CT m zp (Cyc c m' zq))),
+         KSDummyCtx z TrivGad (ZQUp zq) m zp c m' zq,
+         ASTRoundCTCtx CTDOM dom' c m m' zp zq (ZQDown zq))
+  => CTExpr (SHE.CT m zp (Cyc c m' zq))
+     -> CTExpr (SHE.CT m zp (Cyc c m' zq))
+     -> CTExpr (SHE.CT m zp (Cyc c m' (ZQDown zq)))
 a ** b =
   let c = a*b
       c' = ksqHelper c
@@ -173,13 +172,42 @@ type ZQSeq = '[ZQ6, ZQ5, ZQ4, ZQ3, ZQ2, ZQ1]
 type ZQUp zq = PrevListElt zq ZQSeq
 type ZQDown zq = NextListElt zq ZQSeq
 
-type family ZQRoundDown zq where
-  ZQRoundDown ZQ4 = ZQ3
-  ZQRoundDown ZQ3 = ZQ2
-  ZQRoundDown ZQ2 = ZQ1
-
 type family NextListElt x xs where
   NextListElt x (x ': y ': ys) = y
   NextListElt x (y ': ys) = NextListElt x ys
+  NextListElt x '[] = ()
 
 type PrevListElt x xs = NextListElt x (Reverse xs)
+
+
+type RngList = '[ '(H0,H0'), '(H1,H1'), '(H2,H2'), '(H3,H3'), '(H4,H4'), '(H5,H5') ]
+
+
+
+class Tunnel xs c zp zq where
+  tunnel' :: (Head xs ~ '(r,r'), Last xs ~ '(s,s')) => 
+    Proxy xs -> CTExpr (SHE.CT r zp (Cyc c r' zq)) -> CTExpr (SHE.CT s zp (Cyc c s' zq))
+
+instance Tunnel '[ '(m,m') ] c zp zq where
+  tunnel' _ = id
+
+instance (ASTTunnelCtx CTDOM dom' TrivGad c r r' t t' e e' z zp zq,
+          Tunnel ('(t,t') ': rngs) c zp zq)
+  => Tunnel ('(r,r') ': '(t,t') ': rngs) c zp zq where
+  tunnel' _ = tunnel' (Proxy::Proxy ('(t,t') ': rngs)) . tunnHelper (Proxy::Proxy '(t,t'))
+
+tunnel :: (Head rngs ~ '(r,r'), Last rngs ~ '(s,s'), Tunnel rngs c zp (ZQUp zq), ZQDown (ZQUp zq) ~ zq, 
+           ASTRoundCTCtx CTDOM dom' c r r' zp zq (ZQUp zq),
+           ASTRoundCTCtx CTDOM dom' c s s' zp (ZQUp zq) zq,
+           ASTRoundCTCtx CTDOM dom' c s s' zp zq (ZQDown zq)) => 
+  Proxy rngs -> CTExpr (SHE.CT r zp (Cyc c r' zq)) -> CTExpr (SHE.CT s zp (Cyc c s' (ZQDown zq)))
+tunnel rngs x = roundCTDown $ roundCTDown $ tunnel' rngs $ roundCTUp x
+{-
+nullTL :: forall (xs :: [k]) . (Typeable xs, Typeable ('[] :: [k])) => Proxy xs -> Bool
+nullTL xs = (typeRep xs) == (typeRep (Proxy::Proxy ('[] :: [k])))
+
+tunnel' :: forall rngs r r' s s' zp c zq . (Head rngs ~ '(r,r'), Last rngs ~ '(s,s'), Typeable (Tail rngs)) => 
+  Proxy rngs -> CTExpr (SHE.CT r zp (Cyc c r' zq)) -> CTExpr (SHE.CT s zp (Cyc c r' (ZQDown zq)))
+tunnel' rngs x | nullTL (Proxy::Proxy (Tail rngs)) = x
+
+-}
