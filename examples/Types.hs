@@ -7,6 +7,8 @@ module Types (
 , H0', H1', H2', H3', H4', H5'  -- ciphertext rings
 , ZP2, ZP4, ZP8                 -- plaintext moduli
 , ZQ1, ZQ2, ZQ3, ZQ4, ZQ5, ZQ6  -- ciphertext moduli
+
+, ZPDiv2, ZQUp, ZQDown, NextListElt, PrevListElt, RngList, MyGad
 , time) where
 
 import Control.Monad
@@ -27,6 +29,26 @@ import Data.Time.Clock
 import System.IO
 import Control.DeepSeq
 import Data.Dynamic
+import Data.Promotion.Prelude.List
+
+type family MyGad
+
+type instance MyGad = TrivGad
+
+type ZPDiv2 zp = NextListElt zp '[ZP8, ZP4, ZP2]
+type ZQSeq = '[ZQ6, ZQ5, ZQ4, ZQ3, ZQ2, ZQ1]
+type ZQUp zq = PrevListElt zq ZQSeq
+type ZQDown zq = NextListElt zq ZQSeq
+
+type family NextListElt (x :: k) (xs :: [k]) :: k where
+  NextListElt x (x ': y ': ys) = y
+  NextListElt x (y ': ys) = NextListElt x ys
+
+type PrevListElt x xs = NextListElt x (Reverse xs)
+
+type RngList = '[ '(H0,H0'), '(H1,H1'), '(H2,H2'), '(H3,H3'), '(H4,H4'), '(H5,H5') ]
+
+
 
 type H0 = 'F '[ 'PP '(N2, N7) ]
 type H1 = 'F '[ 'PP '(N2, N6), 'PP '(N7, N1) ]
