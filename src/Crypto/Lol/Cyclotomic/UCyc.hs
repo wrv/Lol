@@ -1,12 +1,12 @@
-{-# LANGUAGE ConstraintKinds, DataKinds, DeriveDataTypeable,
-             FlexibleContexts, FlexibleInstances, GADTs, InstanceSigs,
-             MultiParamTypeClasses, NoImplicitPrelude, PolyKinds,
-             RankNTypes, RebindableSyntax, ScopedTypeVariables,
-             TypeFamilies, TypeOperators, UndecidableInstances #-}
+{-# LANGUAGE ConstraintKinds, DataKinds, FlexibleContexts,
+             FlexibleInstances, GADTs, InstanceSigs, MultiParamTypeClasses,
+             NoImplicitPrelude, PolyKinds, RankNTypes, RebindableSyntax,
+             ScopedTypeVariables, TypeFamilies, TypeOperators,
+             UndecidableInstances #-}
 
 -- | An implementation of cyclotomic rings.
-
--- | __WARNING:__ this module provides an experts-only, "unsafe"
+--
+-- __WARNING:__ this module provides an experts-only, "unsafe"
 -- interface that may result in runtime errors if not used correctly!
 -- 'Crypto.Lol.Cyclotomic.Cyc.Cyc' provides a safe interface, and
 -- should be used in applications whenever possible.
@@ -26,7 +26,7 @@
 -- methods from these classes, first call 'forceBasis' or one of its
 -- specializations ('forcePow', 'forceDec', 'forceAny').
 --
--- | __WARNING:__ as with all fixed-point arithmetic, the functions
+-- __WARNING:__ as with all fixed-point arithmetic, the functions
 -- associated with 'UCyc' may result in overflow (and thereby
 -- incorrect answers and potential security flaws) if the input
 -- arguments are too close to the bounds imposed by the base type.
@@ -41,8 +41,8 @@ module Crypto.Lol.Cyclotomic.UCyc
 , mulG, divG
 , scalarCyc, liftCyc
 , adviseCRT
--- * Error sampling
-, tGaussian, errorRounded, errorCoset
+-- * Error sampling and norm
+, tGaussian, errorRounded, errorCoset, gSqNorm
 -- * Sub/extension rings
 , embed, twace, coeffsCyc, powBasis, crtSet
 -- * Representations
@@ -57,7 +57,6 @@ import           Crypto.Lol.Cyclotomic.Tensor  as T
 import qualified Crypto.Lol.Cyclotomic.Utility as U
 import           Crypto.Lol.Gadget
 import           Crypto.Lol.LatticePrelude     as LP hiding ((*>))
-import           Crypto.Lol.Types.FiniteField
 import           Crypto.Lol.Types.ZPP
 
 import Algebra.Additive     as Additive (C)
@@ -73,7 +72,6 @@ import Data.Coerce
 import Data.Foldable          as F
 import Data.Maybe
 import Data.Traversable
-import Data.Typeable
 import Test.QuickCheck
 
 --import qualified Debug.Trace as DT
@@ -101,13 +99,12 @@ data UCyc t (m :: Factored) r where
 
   --EAC: Consider this representation for product rings, but beware of combinatorial explosion of cases.
   --Product :: !(UCyc t m a) -> !(UCyc t m b) -> UCyc t m (a,b)
-  deriving (Typeable)
 
 -- | Shorthand for frequently reused constraints that are needed for
 --  change of basis.
 type UCCtx t r = (Tensor t, RElt t r, RElt t (CRTExt r), CRTEmbed r)
 
--- | Collection of constraints need to work on most functions over a
+-- | Collection of constraints needed for most functions over a
 -- particular base ring @r@.
 type RElt t r = (TElt t r, CRTrans r, IntegralDomain r, ZeroTestable r, NFData r)
 
@@ -298,7 +295,7 @@ unzipCyc (Sub c) = Sub *** Sub $ unzipCyc c
 instance (Correct gad zq, Fact m, CElt t zq) => Correct gad (UCyc t m zq) where
   -- sequence: Monad [] and Traversable (UCyc t m)
   -- sequenceA: Applicative (UCyc t m) and Traversable (TaggedT gad [])
-  correct bs = second sequence $ unzipCyc $ (correct . pasteT) <$> 
+  correct bs = second sequence $ unzipCyc $ (correct . pasteT) <$>
                sequenceA (forceDec <$> peelT bs)
 
 -- generic RescaleCyc instance
@@ -378,6 +375,11 @@ tGaussian :: (Fact m, OrdFloat q, Random q, CElt t q,
              => v -> rnd (UCyc t m q)
 tGaussian = liftM Dec . tGaussianDec
 
+-- | Same as 'Crypto.Lol.Cyclotomic.Cyc.gSqNorm', but for 'UCyc'.
+gSqNorm :: (Fact m, CElt t r) => UCyc t m r -> r
+gSqNorm (Dec v) = gSqNormDec v
+gSqNorm c = gSqNorm $ toDec' c
+
 -- | Same as 'Crypto.Lol.Cyclotomic.Cyc.errorRounded', but for 'UCyc'.
 errorRounded :: forall v rnd t m z .
                 (ToInteger z, Fact m, CElt t z, ToRational v, MonadRandom rnd)
@@ -444,9 +446,9 @@ powBasis = map Pow <$> powBasisPow
 
 -- | Same as 'Crypto.Lol.Cyclotomic.Cyc.crtSet', but for 'UCyc'.
 crtSet :: forall t m m' r p mbar m'bar .
-           (m `Divides` m', ZPP r, p ~ CharOf (ZPOf r),
+           (m `Divides` m', ZPP r, p ~ CharOf (ZpOf r),
             mbar ~ PFree p m, m'bar ~ PFree p m',
-            CElt t r, CElt t (ZPOf r))
+            CElt t r, CElt t (ZpOf r))
            => Tagged m [UCyc t m' r]
 crtSet =
   -- CJP: consider using traceEvent or traceMarker
@@ -458,7 +460,7 @@ crtSet =
       pm = Proxy::Proxy m
       pm' = Proxy::Proxy m'
   in retag (fmap (embed . (^(p^(e-1))) . Dec . fmapT liftZp) <$>
-            (crtSetDec :: Tagged mbar [t m'bar (ZPOf r)]))
+            (crtSetDec :: Tagged mbar [t m'bar (ZpOf r)]))
      \\ pFreeDivides pp pm pm'
      \\ pSplitTheorems pp pm \\ pSplitTheorems pp pm'
 

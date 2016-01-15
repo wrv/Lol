@@ -14,7 +14,7 @@
 -- offers limited exposure of internal representation, use
 -- 'Crypto.Lol.Cyclotomic.UCyc.UCyc'.
 --
--- | __WARNING:__ as with all fixed-point arithmetic, the functions
+-- __WARNING:__ as with all fixed-point arithmetic, the functions
 -- associated with 'Cyc' may result in overflow (and thereby
 -- incorrect answers and potential security flaws) if the input
 -- arguments are too close to the bounds imposed by the base type.
@@ -29,8 +29,8 @@ module Crypto.Lol.Cyclotomic.Cyc
 , mulG, divG
 , scalarCyc, liftCyc
 , advisePow, adviseDec, adviseCRT
--- * Error sampling
-, tGaussian, errorRounded, errorCoset
+-- * Error sampling and norm
+, tGaussian, errorRounded, errorCoset, gSqNorm
 -- * Sub/extension rings
 , embed, twace, powBasis, crtSet, coeffsCyc
 , module Crypto.Lol.Cyclotomic.Utility
@@ -141,6 +141,12 @@ tGaussian :: (Fact m, OrdFloat q, Random q, CElt t q,
              => v -> rnd (Cyc t m q)
 tGaussian = (Cyc <$>) . U.tGaussian
 
+-- | Yield the scaled squared norm of @g_m \cdot e@ under
+-- the canonical embedding, namely, 
+-- @\hat{m}^{ -1 } \cdot || \sigma(g_m \cdot e) ||^2@ .
+gSqNorm :: (Fact m, CElt t r) => Cyc t m r -> r
+gSqNorm (Cyc c) = U.gSqNorm c
+
 -- | Generate an LWE error term with given scaled variance,
 -- deterministically rounded in the decoding basis.
 errorRounded :: (ToInteger z, Fact m, CElt t z,
@@ -177,8 +183,8 @@ coeffsCyc = coerceCyc U.coeffsCyc
 powBasis :: (m `Divides` m', CElt t r) => Tagged m [Cyc t m' r]
 powBasis = coerceCyc U.powBasis
 
--- | The relative mod-@r@ "CRT set" of the extension.
-crtSet :: (m `Divides` m', ZPP r, CElt t r, CElt t (ZPOf r))
+-- | The relative mod-@r@ CRT set of the extension.
+crtSet :: (m `Divides` m', ZPP r, CElt t r, CElt t (ZpOf r))
           => Tagged m [Cyc t m' r]
 crtSet = coerceCyc U.crtSet
 
@@ -192,5 +198,3 @@ liftCyc = coerceCyc U.liftCyc
 -- | Embed a scalar from the base ring as a cyclotomic element.
 scalarCyc :: (Fact m, CElt t a) => a -> Cyc t m a
 scalarCyc = Cyc . U.scalarCyc
-
-

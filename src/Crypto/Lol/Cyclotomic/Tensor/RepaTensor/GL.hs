@@ -2,7 +2,7 @@
              MultiParamTypeClasses, NoImplicitPrelude, RankNTypes,
              RebindableSyntax, ScopedTypeVariables #-}
 
--- | The G and L transforms for Repa arrays
+-- | The @G@ and @L@ transforms for Repa arrays.
 
 module Crypto.Lol.Cyclotomic.Tensor.RepaTensor.GL
 ( fL, fLInv, fGPow, fGDec, fGInvPow, fGInvDec
@@ -18,22 +18,28 @@ fL, fLInv, fGPow, fGDec :: (Fact m, Additive r, Unbox r, Elt r)
 fGInvPow, fGInvDec ::
  (Fact m, IntegralDomain r, ZeroTestable r, Unbox r, Elt r)
   => Arr m r -> Maybe (Arr m r)
--- | Arbitrary-index L transform to convert a dec-basis Repa array to its powerful-basis representation
+-- | Arbitrary-index @L@ transform, which converts from decoding-basis
+-- to powerful-basis representation.
 fL = eval $ fTensor $ ppTensor pL
--- | Arbitrary-index L^{ -1 } transform to convert a powerful-basis Repa array to its dec-basis representation
+-- | Arbitrary-index @L^{ -1 }@ transform, which converts from
+-- powerful-basis to decoding-basis representation.
 fLInv = eval $ fTensor $ ppTensor pLInv
--- | Arbitrary-index multiplication by the ring element g in the powerful basis
+-- | Arbitrary-index multiplication by @g_m@ in the powerful basis.
 fGPow = eval $ fTensor $ ppTensor pGPow
--- | Arbitrary-index multiplication by the ring element g in the dec basis
+-- | Arbitrary-index multiplication by @g_m@ in the decoding basis.
 fGDec = eval $ fTensor $ ppTensor pGDec
--- | Arbitrary-index division by the ring element g in the powerful basis. May fail if the input is not a multiple of g.
+-- | Arbitrary-index division by @g_m@ in the powerful
+-- basis. Outputs 'Nothing' if the input is not evenly divisible by
+-- @g_m@.  Warning: not constant time!
 fGInvPow = wrapGInv' pGInvPow'
--- | Arbitrary-index multiplication by the ring element g in the dec basis. May fail if the input is not a multiple of g.
+-- | Arbitrary-index division by @g_m@ in the decoding
+-- basis. Outputs 'Nothing' if the input is no evenly divisible by
+-- @g_m@.  Warning: not constant time!
 fGInvDec = wrapGInv' pGInvDec'
 
 wrapGInv' :: forall m r .
   (Fact m, IntegralDomain r, ZeroTestable r, Unbox r, Elt r)
-  => (forall p . (NatC p) => Tagged p (Trans r))
+  => (forall p . Prim p => Tagged p (Trans r))
   -> Arr m r -> Maybe (Arr m r)
 wrapGInv' ginv =
   let fGInv = eval $ fTensor $ ppTensor ginv
@@ -50,20 +56,20 @@ divCheck = coerce $  \ !arr den ->
       out = force $ RT.map fst qrs
   in if pass then Just out else Nothing
 
-pWrap :: forall p r . (NatC p)
+pWrap :: forall p r . Prim p
          => (forall rep . Source rep r => Int -> Array rep DIM2 r -> Array D DIM2 r)
          -> Tagged p (Trans r)
-pWrap f = let pval = proxy valueNatC (Proxy::Proxy p)
+pWrap f = let pval = proxy valuePrime (Proxy::Proxy p)
               -- special case: return identity function for p=2
           in return $ if pval > 2
                       then trans  (pval-1) $ f pval
                       else Id 1
 
 
-pL, pLInv, pGPow, pGDec :: (NatC p, Additive r, Unbox r, Elt r)
+pL, pLInv, pGPow, pGDec :: (Prim p, Additive r, Unbox r, Elt r)
   => Tagged p (Trans r)
 
-pGInvPow', pGInvDec' :: (NatC p, Ring r, Unbox r, Elt r)
+pGInvPow', pGInvDec' :: (Prim p, Ring r, Unbox r, Elt r)
   => Tagged p (Trans r)
 
 pL = pWrap (\_ !arr ->

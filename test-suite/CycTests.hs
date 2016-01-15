@@ -17,7 +17,6 @@ import Crypto.Lol.Types.ZPP
 import Control.Monad (join, liftM2)
 
 import Data.Array.Repa.Eval (Elt)
-import Data.Type.Natural hiding (zero)
 import Data.Vector.Unboxed (Vector, Unbox)
 import Data.Vector.Storable (Storable)
 
@@ -33,7 +32,7 @@ cycTests = [testGroup "coeffsPow" $ groupC $ wrapCmm'rToBool prop_coeffsBasis,
 
 
 type BasisCtx t m m' r = 
-  (m `Divides` m', ZPP r, CElt t r, CElt t (ZPOf r))
+  (m `Divides` m', ZPP r, CElt t r, CElt t (ZpOf r))
 
 prop_coeffsBasis :: forall t m m' r . (BasisCtx t m m' r)
   => Proxy m -> Cyc t m' r -> Bool
@@ -84,8 +83,8 @@ type BasisWrapCCtx m m' r =
 groupMM'R :: 
   (forall m m' r . (BasisWrapCCtx m m' r) => Proxy '(m, m', r) -> Property) 
   -> [Test]
-groupMM'R f = [testProperty "F1/F7/PP8" $ f (Proxy::Proxy '(F1, F7, Zq (PP2 N3))), 
-               testProperty "F1/F7/PP2" $ f (Proxy::Proxy '(F1, F7, Zq (PP2 N1)))] -- add some more test cases
+groupMM'R f = [testProperty "F1/F7/PP8" $ f (Proxy::Proxy '(F1, F7, ZP8)), 
+               testProperty "F1/F7/PP2" $ f (Proxy::Proxy '(F1, F7, ZP2))] -- add some more test cases
 
 
 

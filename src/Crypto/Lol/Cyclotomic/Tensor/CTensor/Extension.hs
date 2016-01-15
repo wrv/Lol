@@ -1,6 +1,6 @@
-{-# LANGUAGE ConstraintKinds, FlexibleContexts, MultiParamTypeClasses,
-             NoImplicitPrelude, RebindableSyntax, ScopedTypeVariables,
-             TypeFamilies, TypeOperators, DataKinds #-}
+{-# LANGUAGE ConstraintKinds, DataKinds, FlexibleContexts, NoImplicitPrelude, 
+             PolyKinds, RebindableSyntax, ScopedTypeVariables,
+             TypeFamilies, TypeOperators #-}
 
 -- | CT-specific functions for embedding/twacing in various bases
 
@@ -100,12 +100,11 @@ powBasisPow' = do
 -- | A list of vectors representing the mod-p CRT set of the
 -- extension O_m'/O_m
 crtSetDec' :: forall m m' fp .
-  (m `Divides` m', PrimeField fp, Coprime (PToF (CharOf fp)) m',
-   SV.Storable fp)
+  (m `Divides` m', PrimeField fp, Coprime (PToF (CharOf fp)) m', SV.Storable fp)
   => Tagged '(m, m') [SV.Vector fp]
 crtSetDec' =
   let m'p = Proxy :: Proxy m'
-      p = proxy value (Proxy::Proxy (CharOf fp))
+      p = proxy valuePrime (Proxy::Proxy (CharOf fp))
       phi = proxy totientFact m'p
       d = proxy (order p) m'p
       h :: Int = proxy valueHatFact m'p

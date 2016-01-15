@@ -1,13 +1,13 @@
 {-# LANGUAGE BangPatterns, ConstraintKinds, DataKinds, FlexibleContexts,
              FlexibleInstances, MultiParamTypeClasses, NoImplicitPrelude,
-             ScopedTypeVariables, TemplateHaskell, TypeFamilies,
+             PolyKinds, ScopedTypeVariables, TemplateHaskell, TypeFamilies,
              TypeOperators #-}
 
 -- | RT-specific functions for embedding/twacing in various bases
 
 module Crypto.Lol.Cyclotomic.Tensor.RepaTensor.Extension
 ( twacePowDec', twaceCRT', embedPow', embedDec', embedCRT'
-, coeffs', powBasisPow', crtSetDec' --, fromCoeffs'
+, coeffs', powBasisPow', crtSetDec'
 ) where
 
 import           Crypto.Lol.LatticePrelude              as LP hiding (lift, (!!))
@@ -125,12 +125,12 @@ powBasisPow' = return $
 -- | A list of arrays representing the mod-p CRT set of the
 -- extension O_m'/O_m
 crtSetDec' :: forall m m' fp .
-              (m `Divides` m', PrimeField fp, 
-               Coprime (PToF (CharOf fp)) m', Unbox fp)
+              (m `Divides` m', PrimeField fp, Coprime (PToF (CharOf fp)) m',
+               Unbox fp)
               => Tagged m [Arr m' fp]
 crtSetDec' = return $ 
   let m'p = Proxy :: Proxy m'
-      p = proxy value (Proxy::Proxy (CharOf fp))
+      p = proxy valuePrime (Proxy::Proxy (CharOf fp))
       phi = proxy totientFact m'p
 
       d = proxy (order p) m'p

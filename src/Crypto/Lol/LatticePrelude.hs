@@ -11,11 +11,12 @@
 -- assorted utility functions.
 
 module Crypto.Lol.LatticePrelude
-( 
--- * Classes
+(
+-- * Classes and families
   Enumerable(..)
 , Mod(..)
 , Reduce(..), LiftOf, Lift, Lift'(..), Rescale(..), Encode(..), msdToLSD
+, CharOf
 -- * Numeric
 , module Crypto.Lol.Types.Numeric
 -- * Complex
@@ -64,6 +65,10 @@ derivingUnbox "Maybe"
   [| \ (b, x) -> if b then Just x else Nothing |]
 
 instance Default Bool where def = False
+
+-- | The characteristic of a ring, represented as a type.
+
+type family CharOf fp :: k
 
 -- | Poor man's 'Enum'.
 class Enumerable a where
@@ -244,7 +249,7 @@ pasteT = coerce
 withWitness :: forall n r . (SingI n => Tagged n r) -> Sing n -> r
 withWitness t wit = withSingI wit $ proxy t (Proxy::Proxy n)
 
--- | Monadic version of 'withWitness'.
-withWitnessT :: forall n mon r . (Monad mon) =>
+-- | Transformer version of 'withWitness'.
+withWitnessT :: forall n mon r .
                 (SingI n => TaggedT n mon r) -> Sing n -> mon r
 withWitnessT t wit = withSingI wit $ proxyT t (Proxy::Proxy n)
