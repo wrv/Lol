@@ -248,7 +248,7 @@ maybeGenLinHint :: forall mon gad r s zp t r' s' zq z e e' .
    TunnelCtx t e r s e' r' s' z zp zq gad,
    e ~ FGCD r s,
    ZPP zp,
-   CElt t (ZPOf zp),
+   CElt t (ZpOf zp),
    Typeable (Cyc t r' z),
    Typeable (Cyc t s' z),
    Typeable (CT r zp (Cyc t r' zq)), 

@@ -1,6 +1,6 @@
 {-# LANGUAGE KindSignatures, NoImplicitPrelude, PolyKinds, DataKinds, FlexibleInstances, RankNTypes,
              TypeOperators, ConstraintKinds, FlexibleContexts, ScopedTypeVariables, 
-             MultiParamTypeClasses, TypeFamilies, RebindableSyntax #-}
+             MultiParamTypeClasses, TemplateHaskell, TypeFamilies, RebindableSyntax #-}
 
 module Types (
   H0, H1, H2, H3, H4, H5        -- plaintext rings
@@ -11,12 +11,13 @@ module Types (
 , ZPDiv2, ZQUp, ZQDown, NextListElt, PrevListElt, RngList, MyGad
 , time) where
 
+import Algebra.Ring
+
 import Control.Monad
 import Control.Monad.Random
 
 import Crypto.Lol.Reflects
-import Crypto.Lol.Factored
-import Crypto.Lol
+import Crypto.Lol hiding (primes, (^))
 
 import Data.List (foldl1')
 import Data.Type.Natural
@@ -48,59 +49,37 @@ type PrevListElt x xs = NextListElt x (Reverse xs)
 
 type RngList = '[ '(H0,H0'), '(H1,H1'), '(H2,H2'), '(H3,H3'), '(H4,H4'), '(H5,H5') ]
 
-
-
-type H0 = 'F '[ 'PP '(N2, N7) ]
-type H1 = 'F '[ 'PP '(N2, N6), 'PP '(N7, N1) ]
-type H2 = 'F '[ 'PP '(N2, N5), 'PP '(N7, N1), 'PP '(N13, N1) ]
-type H3 = 'F '[ 'PP '(N2, N3), 'PP '(N5, N1), 'PP '(N7, N1), 'PP '(N13, N1) ]
-type H4 = 'F '[ 'PP '(N2, N2), 'PP '(N3, N1), 'PP '(N5, N1), 'PP '(N7, N1), 'PP '(N13, N1) ]
-type H5 = 'F '[ 'PP '(N3, N2), 'PP '(N5, N1), 'PP '(N7, N1), 'PP '(N13, N1) ]
-type H0' = 'F '[ 'PP '(N2, N7), 'PP '(N7, N1), 'PP '(N13, N1) ]
-type H1' = 'F '[ 'PP '(N2, N6), 'PP '(N7, N1), 'PP '(N13, N1) ]
-type H2' = 'F '[ 'PP '(N2, N5), 'PP '(N7, N1), 'PP '(N13, N1) ]
-type H3' = 'F '[ 'PP '(N2, N3), 'PP '(N5, N1), 'PP '(N7, N1), 'PP '(N13, N1) ]
-type H4' = 'F '[ 'PP '(N2, N2), 'PP '(N3, N1), 'PP '(N5, N1), 'PP '(N7, N1), 'PP '(N13, N1) ]
-type H5' = 'F '[ 'PP '(N3, N2), 'PP '(N5, N1), 'PP '(N7, N1), 'PP '(N13, N1) ]
+type H0 = $(fType $ 2^7)
+type H1 = $(fType $ 2^6 * 7)
+type H2 = $(fType $ 2^5 * 7 * 13)
+type H3 = $(fType $ 2^3 * 5 * 7 * 13)
+type H4 = $(fType $ 2^2 * 3 * 5 * 7 * 13)
+type H5 = $(fType $ 3^2 * 5 * 7 * 13)
+type H0' = $(fType $ 2^7 * 7 * 13)
+type H1' = $(fType $ 2^6 * 7 * 13)
+type H2' = $(fType $ 2^5 * 7 * 13)
+type H3' = $(fType $ 2^3 * 5 * 7 * 13)
+type H4' = $(fType $ 2^2 * 3 * 5 * 7 * 13)
+type H5' = $(fType $ 3^2 * 5 * 7 * 13)
 
 -- three 24-bit moduli, enough to handle rounding for p=32 (depth-4 circuit at ~17 bits per mul)
-data Q18869761
-instance (ToInteger i) => Reflects Q18869761 i where value = return 18869761
-type ZQ1 = Zq Q18869761
-
-data Q19393921
-instance (ToInteger i) => Reflects Q19393921 i where value = return 19393921
-type ZQ2 = (Zq Q19393921, ZQ1)
-
-data Q19918081
-instance (ToInteger i) => Reflects Q19918081 i where value = return 19918081
-type ZQ3 = (Zq Q19918081, ZQ2)
-
+type ZQ1 = Zq 18869761
+type ZQ2 = (Zq 19393921, ZQ1)
+type ZQ3 = (Zq 19918081, ZQ2)
 -- a 31-bit modulus, for rounding off after the last four hops
-data Q2149056001
-instance (ToInteger i) => Reflects Q2149056001 i where value = return 2149056001
-type ZQ4 = (Zq Q2149056001, ZQ3)
-
+type ZQ4 = (Zq 2149056001, ZQ3)
 -- for rounding off after the first hop
-data Q3144961
-instance (ToInteger i) => Reflects Q3144961 i where value = return 3144961
-type ZQ5 = (Zq Q3144961, ZQ4)
-
-data Q7338241
-instance (ToInteger i) => Reflects Q7338241 i where value = return 7338241
-type ZQ6 = (Zq Q7338241, ZQ5)
+type ZQ5 = (Zq 3144961, ZQ4)
+type ZQ6 = (Zq 7338241, ZQ5)
 
 
 type Zq (q :: k) = ZqBasic q Z
 type Z = Int64
 
-type PP2 e = ToPP N2 e
-type PP3 e = ToPP N3 e
-
-type ZP2 = Zq (PP2 N1)
-type ZP3 = Zq (PP3 N1)
-type ZP4 = Zq (PP2 N2)
-type ZP8 = Zq (PP2 N3)
+type ZP2 = Zq PP2
+type ZP3 = Zq PP3
+type ZP4 = Zq PP4
+type ZP8 = Zq PP8
 
 -- odd primes < 20
 primes = [3,5,7,11,13,17,19]
@@ -129,7 +108,7 @@ genHopRngs :: Int -> Int -> [Int] -> Maybe [Int]
 genHopRngs 1 lasts _ = Just [] -- we dont' need any more slots
 genHopRngs _ _ [] = Nothing  -- we need more slots but don't have more primes
 genHopRngs r lasts (s:ss) = do
-  let usableSlots = 2^(floor ((log $ fromIntegral $ crtSetSize lasts s)/(log 2)::Double) :: Int)
+  let usableSlots = 2^(floor ((log $ fromIntegral $ crtSetSize lasts s)/(log 2)::Double))
   if usableSlots > 1
   then let r' = if r == 4
                 then 1
@@ -138,7 +117,7 @@ genHopRngs r lasts (s:ss) = do
        in fmap (h :) $ genHopRngs r' s ss
   else Nothing
 
-test = genRingHopInfo 5 (2^(31::Int))
+test = genRingHopInfo 5 (2^31)
   [128,64,32,8,4,1] 
   [1,7,7*13,5*7*13,3*5*7*13,9*5*7*13]
   [7*13,1, 1,1,1,1]
@@ -171,9 +150,9 @@ genRingHopInfo numMods lbd rs ss pads
     putStrLn $ "ct dims: " ++ (show $ map totientInt hs')
     putStrLn $ show hs'
 
-    let mods = (take 3 $ goodQs compositumDim (2^(24::Int))) ++
-               [head $ goodQs compositumDim (2^(21::Int)),
-                head $ goodQs compositumDim (2^(15::Int))]
+    let mods = (take 3 $ goodQs compositumDim (2^24)) ++
+               [head $ goodQs compositumDim (2^21),
+                head $ goodQs compositumDim (2^15)]
     --mapM (putStrLn . printMod) $ zip [1..] mods
 
     return ()
@@ -181,7 +160,7 @@ genRingHopInfo numMods lbd rs ss pads
 printFactors :: [Int] -> IO ()
 printFactors xs = 
   printList $ 
-    map ((map (\(p,e) -> fromInteger (p^e) :: Int)) . factorise . fromIntegral) xs
+    map ((map (\(p,e) -> fromInteger (p^(fromIntegral e)) :: Int)) . factorise . fromIntegral) xs
 
 printList :: (Show a) => [a] -> IO ()
 printList xs = do
@@ -208,7 +187,7 @@ goodQs m lower = checkVal (lower + ((m-lower) `mod` m) + 1)
 
 totientInt :: Int -> Int
 totientInt = 
-  let totpp (p'',e) = let p' = fromInteger p'' in (p'-1)*p'^(e-1) :: Int
+  let totpp (p'',e) = let p' = fromInteger p'' in (p'-1)*p'^(fromIntegral $ e-1) :: Int
   in product . map totpp . factorise . fromIntegral
 
 printNat :: Int -> String
@@ -274,7 +253,7 @@ putStr' str = do
   hFlush stdout
 
 --rounds to precision, for pretty printing
-toPrecision :: (Field a, RealRing a) => Int -> a -> a
+toPrecision :: (Field a, RealRing a) => Integer -> a -> a
 toPrecision n x = (fromInteger $ round $ x * (10^n)) / (10.0^n)
 
 printTimes :: Maybe Bool -> UTCTime -> Int -> IO ()

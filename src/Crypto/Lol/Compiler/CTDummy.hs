@@ -53,7 +53,7 @@ data CTDummyOps :: (* -> *) where
   TunnDummy :: 
     (TunnelCtx c e r s e' r' s' z zp zq gad, e ~ FGCD r s, Fact r,
      Typeable c, Typeable r', Typeable s', Typeable z, Typeable s, Typeable r, 
-     Typeable gad, Typeable zq, Typeable zp, CElt c (ZPOf zp),
+     Typeable gad, Typeable zq, Typeable zp, CElt c (ZpOf zp),
      ZPP zp)
            => proxy gad -> CTDummyOps (CT r zp (Cyc c r' zq) :-> Full (CT s zp (Cyc c s' zq)))
 
@@ -86,7 +86,7 @@ ksqDummy = return . (injT (KeySwQDummy (Proxy::Proxy gad) (Proxy::Proxy zq')) :$
 type ASTTunnelCtx dom dom' gad c r r' s s' e e' z zp zq =
   (CTDummyOps :<: dom', dom ~ Typed dom', TunnelCtx c e r s e' r' s' z zp zq gad, e ~ FGCD r s, 
    Fact r, Typeable c, Typeable r', Typeable s', Typeable z, Typeable s, Typeable r,
-   Typeable gad, Typeable zq, Typeable zp, CElt c (ZPOf zp), ZPP zp)
+   Typeable gad, Typeable zq, Typeable zp, CElt c (ZpOf zp), ZPP zp)
 
 tunnDummy :: forall dom dom' gad c r r' s s' e e' z zp zq . 
   (ASTTunnelCtx dom dom' gad c r r' s s' e e' z zp zq)
