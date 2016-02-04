@@ -80,7 +80,7 @@ hInt_t reciprocal (hInt_t a, hInt_t b)
 }
 
 //for square transforms
-void tensorFuser (void* y, funcPtr f, hDim_t totm, PrimeExponent* peArr, hShort_t sizeOfPE, hInt_t q)
+void tensorFuser (void* y, hShort_t tupSize, funcPtr f, hDim_t totm, PrimeExponent* peArr, hShort_t sizeOfPE, hInt_t* qs)
 {
     hDim_t lts = totm;
     hDim_t rts = 1;
@@ -92,12 +92,12 @@ void tensorFuser (void* y, funcPtr f, hDim_t totm, PrimeExponent* peArr, hShort_
         hDim_t ipow_pe = ipow(pe.prime, (pe.exponent-1));
         hDim_t dim = (pe.prime-1) * ipow_pe;  // the totient of pe
         lts /= dim;
-        (*f) (y, pe, lts, rts, q);
+        (*f) (y, tupSize, pe, lts, rts, qs);
         rts  *= dim;
     }
 }
 
-void tensorFuserCRT (void* y, crtFuncPtr f, hDim_t totm, PrimeExponent* peArr, hShort_t sizeOfPE, void** ru, hInt_t q)
+void tensorFuserCRT (void* y, hShort_t tupSize, crtFuncPtr f, hDim_t totm, PrimeExponent* peArr, hShort_t sizeOfPE, void** ru, hInt_t* q)
 {
     hDim_t lts = totm;
     hDim_t rts = 1;
@@ -109,7 +109,7 @@ void tensorFuserCRT (void* y, crtFuncPtr f, hDim_t totm, PrimeExponent* peArr, h
         hDim_t ipow_pe = ipow(pe.prime, (pe.exponent-1));
         hDim_t dim = (pe.prime-1) * ipow_pe;  // the totient of pe
         lts /= dim;
-        (*f) (y, lts, rts, pe, ru[i], q);
+        (*f) (y, tupSize, lts, rts, pe, ru[i], q);
         rts  *= dim;
     }
 }
@@ -206,6 +206,7 @@ void getStats() {
     printf("\nG Stats:\n");
     printf("GPow_R: %d\t%s\t%d\t%s\n", gprCtr, tsShow(gprTime, false, timeformat), giprCtr, tsShow(giprTime, false, timeformat));
     printf("GPow_Rq: %d\t%s\t%d\t%s\n", gprqCtr, tsShow(gprqTime, false, timeformat), giprqCtr, tsShow(giprqTime, false, timeformat));
+    printf("GPow_C: %d\t%s\t%d\t%s\n", gpcCtr, tsShow(gpcTime, false, timeformat), gipcCtr, tsShow(gipcTime, false, timeformat));
     printf("GDec_R: %d\t%s\t%d\t%s\n", gdrCtr, tsShow(gdrTime, false, timeformat), gidrCtr, tsShow(gidrTime, false, timeformat));
     printf("GDec_Rq: %d\t%s\t%d\t%s\n", gdrqCtr, tsShow(gdrqTime, false, timeformat), gidrqCtr, tsShow(gidrqTime, false, timeformat));
     printf("GCRT_Rq: %d\t%d\t%s\n", gcrqCtr, gicrqCtr, tsShow(gcrqTime, false, timeformat));
@@ -234,10 +235,12 @@ void getStats() {
     crtInvCCtr = 0;
 
     gprCtr = 0;
+    gpcCtr = 0;
     gprqCtr = 0;
     gdrCtr = 0;
     gdrqCtr = 0;
     giprCtr = 0;
+    gipcCtr = 0;
     giprqCtr = 0;
     gidrCtr = 0;
     gidrqCtr = 0;
@@ -275,10 +278,12 @@ void getStats() {
     normrTime = (struct timespec){0,0};
 
     gprTime = (struct timespec){0,0};
+    gpcTime = (struct timespec){0,0};
     gprqTime = (struct timespec){0,0};
     gdrTime = (struct timespec){0,0};
     gdrqTime = (struct timespec){0,0};
     giprTime = (struct timespec){0,0};
+    gipcTime = (struct timespec){0,0};
     giprqTime = (struct timespec){0,0};
     gidrTime = (struct timespec){0,0};
     gidrqTime = (struct timespec){0,0};
