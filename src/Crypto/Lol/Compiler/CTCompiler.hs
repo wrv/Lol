@@ -80,7 +80,7 @@ genKeysWrapper v node args = do
 
 genKeys' :: forall sym v mon sig . (InferDoms sym, ToRational v, NFData v, MonadRandom mon, Typeable sym,
   MonadState (Map TypeRep (Int, Dynamic)) mon)
-  => v -> (Typed sym) sig -> Args (AST ((Typed sym) :&: IDDecor)) sig -> StateT Env mon (IDDecor (DenResult sig))
+  => v -> (Typed sym) sig -> Args (AST (Typed sym :&: IDDecor)) sig -> StateT Env mon (IDDecor (DenResult sig))
 genKeys' v node (arg1 :* arg2 :* Nil)
   | Just Mul <- prj node,
     (kid1, p1) <- unKeyID $ getDecor arg1,
@@ -101,7 +101,7 @@ genKeys' v node Nil
     case lookup name env of
      Just (Hidden (Proxy::Proxy (sim (CT m zp (Cyc t m' zq)), sim' (CT m zp (Cyc t m' zq)))) dict) -> 
       case eqT of
-       Just (Refl :: (Proxy (sim (CT m zp (Cyc t m' zq)), sim' (CT m zp (Cyc t m' zq))) :~: (Proxy (sym (CT m zp (Cyc t m' zq)), (sym :&: IDDecor) (CT m zp (Cyc t m' zq)))))) -> 
+       Just (Refl :: (Proxy (sim (CT m zp (Cyc t m' zq)), sim' (CT m zp (Cyc t m' zq))) :~: (Proxy ((Typed sym) (CT m zp (Cyc t m' zq)), (Typed sym :&: IDDecor) (CT m zp (Cyc t m' zq)))))) -> 
         case dict of
          Dict -> do
           kid <- lift $ genKeyIfNotExists (Proxy::Proxy (Cyc t m' (LiftOf zp))) v
@@ -355,8 +355,9 @@ class (BUTCtx a) => BUT sym sym' a where
 type family UnType dom where
   UnType (dom :&: info) = (UnType dom) :&: info
   UnType (Typed dom) = dom
+  UnType dom = dom
 
-instance (InferDoms (UnType sym), Typeable sym, Typeable sym', BUTCtx (CT m zp (Cyc t m' zq))) 
+instance (InferDoms (UnType sym), sym ~ Typed s, Typeable sym, Typeable sym', BUTCtx (CT m zp (Cyc t m' zq))) 
   => BUT sym sym' (CT m zp (Cyc t m' zq)) where
 
   type BUTCtx (CT m zp (Cyc t m' zq)) = 
@@ -370,7 +371,6 @@ instance (InferDoms (UnType sym), Typeable sym, Typeable sym', BUTCtx (CT m zp (
     | Just (TunnDummy _) <- prj node = oneArgBU f node arg
     | Just (AddPublic _) <- prj node = oneArgBU f node arg
     | Just (MulPublic _) <- prj node = oneArgBU f node arg
-{-
   bottomUpMapM'' f ((Sym node) :$ arg1 :$ arg2)
     | Just Add <- prj node = twoArgBU f node arg1 arg2
     | Just Sub <- prj node = twoArgBU f node arg1 arg2
@@ -406,8 +406,8 @@ instance (InferDoms (UnType sym), Typeable sym, Typeable sym', BUTCtx (CT m zp (
            modify $ delete v
            bind' <- bottomUpMapM'' f bind
            f node (bind' :* lam' :* Nil)
--}
-instance (InferDoms (UnType sym), Typeable sym, Typeable sym', BUT sym sym' b) 
+
+instance (InferDoms (UnType sym), sym ~ Typed s, Typeable sym, Typeable sym', BUT sym sym' b) 
   => BUT sym sym' (a -> b) where
 
   type BUTCtx (a -> b) = BUTCtx b
