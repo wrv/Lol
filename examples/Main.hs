@@ -8,7 +8,6 @@ import Crypto.Lol.Compiler.AST hiding (Sub)
 import Crypto.Lol.Compiler.CT
 import Crypto.Lol.Compiler.CTDummy
 import Crypto.Lol.Compiler.CTCompiler
-import Crypto.Lol.Compiler.PTCompiler
 import Language.Syntactic.Sugar.BindingTyped () -- need for instance of Syntactic (a->b) when using `share` below
 import Language.Syntactic hiding (size)
 import Language.Syntactic.Functional (lamTyped, BindingT)
