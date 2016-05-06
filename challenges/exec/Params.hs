@@ -15,7 +15,7 @@ import Text.Parsec.Token
 data ChallengeParams =
     C { m :: Int32, q :: Int64, svar :: Double, numSamples :: Int32,
         numInstances :: InstanceID, eps :: Double }
-  | D { m :: Int32, q :: Int64, svar :: Double, numSamples :: Int32,
+  | D { m :: Int32, qs :: [Int64], svar :: Double, numSamples :: Int32,
         numInstances :: InstanceID, eps :: Double }
   | R { m :: Int32, q :: Int64, p :: Int64, numSamples :: Int32,
         numInstances :: InstanceID }
@@ -61,9 +61,11 @@ parseIntegral = fromIntegral <$> lex (natural langParser)
 parseDouble :: (Monad m, Stream s m Char) => ParsecT s u m Double
 parseDouble = lex $ float langParser
 
-parseWord ::  (Monad m, Stream s m Char) => String -> ParsecT s u m ()
+parseWord :: (Monad m, Stream s m Char) => String -> ParsecT s u m ()
 parseWord =  lex . void . try . string
 
+parseIntList :: (Monad m, Stream s m Char, Integral i) => ParsecT s u m [i]
+parseIntList = lex $ (brackets langParser) (lex $ commaSep1 langParser parseIntegral)
 
 paramsFile :: (MonadError String m, Stream s m Char) => ParsecT s InstanceID m [ChallengeParams]
 paramsFile = do
@@ -75,6 +77,10 @@ line = rlwecParams <|> rlwedParams <|> rlwrParams <?> "Expected one of '" ++
   show contLineID ++ "', '" ++
   show discLineID ++ "', or '" ++
   show rlwrLineID ++ "'."
+
+moduli :: (Stream s m Char) => ParsecT s InstanceID m [Int64]
+moduli = try ((\x->[x]) <$> parseIntegral) <|> try parseIntList <?>
+  "Expected either an integer or a comma-separated list of one or more integers enclosed by '[' ']'"
 
 rlwecParams, rlwedParams, rlwrParams ::
   (MonadError String m, Stream s m Char) => ParsecT s InstanceID m ChallengeParams
@@ -92,7 +98,7 @@ rlwecParams = do
 rlwedParams = do
   parseWord discLineID
   m <- parseIntegral
-  q <- parseIntegral
+  qs <- moduli
   svar <- parseDouble
   numSamples <- parseIntegral
 

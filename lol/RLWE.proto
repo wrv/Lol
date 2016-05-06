@@ -20,10 +20,14 @@ message SampleRLWR {
 // For each of the following, the "xs" array is with respect to the
 // decoding basis.
 
+message ZqProd {
+  repeated uint64 xs = 1;
+}
+
 message Rq {
   required uint32 m  = 1;
-  required uint64 q  = 2;
-  repeated sint64 xs = 3;
+  repeated uint64 qs = 2;
+  repeated ZqProd xs = 3;
 }
 
 message Kq {

@@ -14,3 +14,4 @@ import Crypto.Lol.Cyclotomic.Tensor.RepaTensor as X
 import Crypto.Lol.Types.IrreducibleChar2       as X ()
 import Crypto.Lol.Types.RRq                    as X
 import Crypto.Lol.Types.ZqBasic                as X
+import Crypto.Lol.Types.ZqProd                 as X

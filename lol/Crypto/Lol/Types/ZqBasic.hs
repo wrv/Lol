@@ -15,7 +15,9 @@ import Crypto.Lol.Gadget
 import Crypto.Lol.Prelude           as LP
 import Crypto.Lol.Reflects
 import Crypto.Lol.Types.FiniteField
+import Crypto.Lol.Types.Proto
 import Crypto.Lol.Types.ZPP
+import Crypto.Proto.RLWE.ZqProd
 
 import Math.NumberTheory.Primes.Factorisation
 import Math.NumberTheory.Primes.Testing
@@ -23,8 +25,10 @@ import Math.NumberTheory.Primes.Testing
 import Control.Applicative
 import Control.Arrow
 import Control.DeepSeq        (NFData)
+import Control.Monad.Except hiding (lift)
 import Data.Coerce
 import Data.Maybe
+import qualified Data.Sequence        as S
 import NumericPrelude.Numeric as NP (round)
 import System.Random
 import Test.QuickCheck
@@ -104,15 +108,15 @@ instance (ReflectsTI q z) => Lift' (ZqBasic q z) where
 instance (ReflectsTI q z, ReflectsTI q' z, Ring z)
          => Rescale (ZqBasic q z) (ZqBasic q' z) where
 
-    rescale = rescaleMod
+  rescale = rescaleMod
 
 instance (Reflects p z, ReflectsTI q z,
           Field (ZqBasic p z), Field (ZqBasic q z))
          => Encode (ZqBasic p z) (ZqBasic q z) where
 
-    lsdToMSD = let pval :: z = proxy value (Proxy::Proxy p)
-                   negqval :: z = negate $ proxy value (Proxy::Proxy q)
-               in (reduce' negqval, recip $ reduce' pval)
+  lsdToMSD = let pval :: z = proxy value (Proxy::Proxy p)
+                 negqval :: z = negate $ proxy value (Proxy::Proxy q)
+             in (reduce' negqval, recip $ reduce' pval)
 
 -- | Yield a /principal/ @m@th root of unity @omega_m \in @Z_q^*@.
 -- The implementation requires @q@ to be prime.  It works by finding a
@@ -124,30 +128,30 @@ principalRootUnity ::
     forall m q z . (Reflects m Int, ReflectsTI q z, Enumerable (ZqBasic q z))
                => TaggedT m Maybe (Int -> ZqBasic q z)
 principalRootUnity =        -- use Integers for all intermediate calcs
-    let qval = fromIntegral $ (proxy value (Proxy::Proxy q) :: z)
-        mval = proxy value (Proxy::Proxy m)
-        -- order of Zq^* (assuming q prime)
-        order = qval-1
-        -- the primes dividing the order of Zq^*
-        pfactors = fst <$> factorise order
-        -- the powers we need to check
-        exps = div order <$> pfactors
-        -- whether an element is a generator of Zq^*
-        isGen x = (x^order == one) && all (\e -> x^e /= one) exps
-    in tagT $ if isPrime qval -- for simplicity, require q to be prime
-              then let (mq,mr) = order `divMod` fromIntegral mval
-                   in if mr == 0
-                      then let omega = head (filter isGen values) ^ mq
-                               omegaPows = V.iterateN mval (*omega) one
-                           in Just $ (omegaPows V.!) . (`mod` mval)
-                      else Nothing
-              else Nothing       -- fail if q composite
+  let qval = fromIntegral $ (proxy value (Proxy::Proxy q) :: z)
+      mval = proxy value (Proxy::Proxy m)
+      -- order of Zq^* (assuming q prime)
+      order = qval-1
+      -- the primes dividing the order of Zq^*
+      pfactors = fst <$> factorise order
+      -- the powers we need to check
+      exps = div order <$> pfactors
+      -- whether an element is a generator of Zq^*
+      isGen x = (x^order == one) && all (\e -> x^e /= one) exps
+  in tagT $ if isPrime qval -- for simplicity, require q to be prime
+            then let (mq,mr) = order `divMod` fromIntegral mval
+                 in if mr == 0
+                    then let omega = head (filter isGen values) ^ mq
+                             omegaPows = V.iterateN mval (*omega) one
+                         in Just $ (omegaPows V.!) . (`mod` mval)
+                    else Nothing
+            else Nothing       -- fail if q composite
 
 mhatInv :: forall m q z . (Reflects m Int, ReflectsTI q z, PID z)
            => TaggedT m Maybe (ZqBasic q z)
 mhatInv = let qval = proxy value (Proxy::Proxy q)
           in peelT $ (fmap reduce' . (`modinv` qval) . fromIntegral) <$>
-                 valueHat <$> (value :: Tagged m Int)
+               valueHat <$> (value :: Tagged m Int)
 
 -- instance of CRTrans
 instance (ReflectsTI q z, PID z, Enumerable (ZqBasic q z))
@@ -307,6 +311,16 @@ instance (ReflectsTI q z, Random z) => Arbitrary (ZqBasic q z) where
     in fromIntegral <$> choose (0, qval-1)
 
   shrink = shrinkNothing
+
+instance (Reflects q Int64) => Protoable (ZqBasic q Int64) where
+  -- EAC: ZqProd or Int64? Both cause minor annoyances in Tensor instances
+  type ProtoType (ZqBasic q Int64) = ZqProd
+  toProto (ZqB x) = ZqProd $ S.singleton $ fromIntegral x
+  fromProto (ZqProd s) =
+    if S.length s == 1
+    then return $ fromIntegral $ S.index s 0
+    else throwError $ "Expected a tuple of size 1, but received a tuple of size " ++
+           (show $ S.length s)
 
 -- CJP: restored manual Unbox instances, until we have a better way
 -- (NewtypeDeriving or TH)

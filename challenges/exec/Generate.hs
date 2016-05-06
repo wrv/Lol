@@ -1,5 +1,5 @@
-{-# LANGUAGE FlexibleContexts, NoImplicitPrelude,
-             RebindableSyntax, RecordWildCards, ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds, FlexibleContexts, NoImplicitPrelude, RankNTypes,
+             RebindableSyntax, RecordWildCards, ScopedTypeVariables, TypeFamilies, TypeOperators #-}
 
 module Generate (generateMain) where
 
@@ -8,6 +8,9 @@ import Common
 import Params as P
 
 import Crypto.Lol                 hiding (RRq)
+import Crypto.Lol.CRTrans
+import Crypto.Lol.Cyclotomic.Tensor
+import Crypto.Lol.Reflects
 import Crypto.Lol.RLWE.Continuous as C
 import Crypto.Lol.RLWE.Discrete   as D
 import Crypto.Lol.RLWE.RLWR       as R
@@ -26,6 +29,7 @@ import Crypto.Proto.RLWE.Challenges.Secret           as S
 import Crypto.Proto.RLWE.SampleCont
 import Crypto.Proto.RLWE.SampleDisc
 import Crypto.Proto.RLWE.SampleRLWR
+import qualified Crypto.Proto.RLWE.ZqProd as P
 
 import Crypto.Random.DRBG
 
@@ -35,12 +39,38 @@ import Control.Monad.IO.Class
 import Control.Monad.Random
 
 import Data.ByteString.Lazy as BS (writeFile)
+import qualified Data.Foldable as F
 import Data.Reflection      hiding (D)
+import qualified Data.Sequence as S
 
 import System.Directory (createDirectoryIfMissing)
 
 import Text.ProtocolBuffers        (messagePut)
 import Text.ProtocolBuffers.Header
+
+reifyQList :: [Int64] -> (forall (qs :: [*]) . Proxy qs -> b) -> b
+reifyQList [x] f = reify x $ \(_::Proxy q) -> f (Proxy::Proxy '[q])
+reifyQList (x:xs) f = reify x (\(_::Proxy x) ->
+  reifyQList xs $ \(_::Proxy xs) -> f (Proxy::Proxy (x ': xs)))
+
+reifyZqList :: [Int] -> (forall t . (Show t, Additive t) => Proxy t -> b) -> b
+reifyZqList [x] f = reify x $ \(_::Proxy x) -> f (Proxy::Proxy (Zq x))
+reifyZqList (x:xs) f = reify x (\(_::Proxy x) ->
+  reifyZqList xs $ \(_::Proxy xs) -> f (Proxy::Proxy (Zq x,xs)))
+
+reifyZqProd :: forall i b . [Int64] ->
+  (forall qs . (Reflects qs [Int64],
+                Random (ZqProd qs Int64),
+                CElt T (ZqProd qs Int64),
+                CElt T (LiftOf (ZqProd qs Int64)),
+                Protoable (ZqProd qs Int64)) => Proxy (ZqProd qs Int64) -> b)
+  -> b
+reifyZqProd [x] f = reify x $ \(_::Proxy q) -> f (Proxy::Proxy (ZqProd '[q] Int64))
+reifyZqProd (x:xs) f = reify x (\(_::Proxy q) ->
+  reifyZqProd xs $ \(_::Proxy (ZqProd qs Int64)) -> f (Proxy::Proxy (ZqProd (q ': qs) Int64)))
+
+withQs :: forall zq . (Show zq, Additive zq) => Proxy zq -> IO ()
+withQs _ = print $ show (zero :: zq)
 
 -- Tensor type used to generate instances
 type T = CT
@@ -49,6 +79,7 @@ type T = CT
 -- and an initial beacon address.
 generateMain :: FilePath -> BeaconAddr -> [ChallengeParams] -> IO ()
 generateMain path beaconStart cps = do
+  reifyZqList [3,7,11] withQs
   let len = length cps
       challIDs = take len [0..]
       beaconAddrs = take len $ iterate nextBeaconAddr beaconStart
@@ -78,7 +109,7 @@ challengeName challID params =
   "chall-id" ++ show challID ++
   (case params of
      C{..} -> "-rlwec-m" ++ show m ++ "-q" ++ show q ++ "-v" ++ show svar
-     D{..} -> "-rlwed-m" ++ show m ++ "-q" ++ show q ++ "-v" ++ show svar
+     D{..} -> "-rlwed-m" ++ show m ++ "-qs" ++ show qs ++ "-v" ++ show svar
      R{..} -> "-rlwr-m" ++ show m ++ "-q" ++ show q ++ "-p" ++ show p)
   ++ "-l" ++ show (P.numSamples params)
 
@@ -101,14 +132,15 @@ genInstanceU (Cparams params@ContParams{..}) challengeID instanceID =
   reify q (\(_::Proxy q) ->
     reifyFactI (fromIntegral m) (\(_::proxy m) -> do
       (s', samples' :: [C.Sample T m (Zq q) (RRq q)]) <- instanceCont svar $ fromIntegral numSamples
-      let s'' = Secret{s = toProto s', ..}
+      let qs = S.singleton q -- EAC FIXME
+          s'' = Secret{s = toProto s', ..}
           samples = (uncurry SampleCont) <$> (toProto samples')
       return $ IC s'' InstanceCont{..}))
 
 genInstanceU (Dparams params@DiscParams{..}) challengeID instanceID =
-  reify q (\(_::Proxy q) ->
+  reifyZqProd (F.toList qs) (\(_::Proxy (ZqProd qs Int64)) ->
     reifyFactI (fromIntegral m) (\(_::proxy m) -> do
-      (s', samples' :: [D.Sample T m (Zq q)]) <- instanceDisc svar $ fromIntegral numSamples
+      (s', samples' :: [D.Sample T m (ZqProd qs Int64)]) <- instanceDisc svar $ fromIntegral numSamples
       let s'' = Secret{s = toProto s', ..}
           samples = (uncurry SampleDisc) <$> (toProto samples')
       return $ ID s'' InstanceDisc{..}))
@@ -117,7 +149,8 @@ genInstanceU (Rparams params@RLWRParams{..}) challengeID instanceID =
   reify q (\(_::Proxy q) -> reify p (\(_::Proxy p) ->
     reifyFactI (fromIntegral m) (\(_::proxy m) -> do
       (s', samples' :: [R.Sample T m (Zq q) (Zq p)]) <- instanceRLWR $ fromIntegral numSamples
-      let s'' = Secret{s = toProto s', ..}
+      let qs = S.singleton q -- EAC FIXME
+          s'' = Secret{s = toProto s', ..}
           samples = (uncurry SampleRLWR) <$> (toProto samples')
       return $ IR s'' InstanceRLWR{..})))
 
@@ -130,7 +163,8 @@ toProtoParams C{..} =
 toProtoParams D{..} =
   reifyFactI (fromIntegral m) (\(_::proxy m) ->
     let bound = proxy (D.errorBound svar eps) (Proxy::Proxy m)
-    in Dparams $ DiscParams {..})
+        qs' = toProto qs
+    in Dparams $ DiscParams {qs=qs',..})
 toProtoParams R{..} = Rparams $ RLWRParams {..}
 
 -- | Writes a 'ChallengeU' to a file given a path to the root of the tree

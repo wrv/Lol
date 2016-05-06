@@ -1,6 +1,6 @@
-{-# LANGUAGE ConstraintKinds, FlexibleContexts, FlexibleInstances,
+{-# LANGUAGE ConstraintKinds, DataKinds, FlexibleContexts, FlexibleInstances,
              MultiParamTypeClasses, PolyKinds, ScopedTypeVariables,
-             TypeFamilies, UndecidableInstances #-}
+             TypeFamilies, TypeOperators, UndecidableInstances #-}
 
 -- | This module contains the functions to transform Haskell types into their
 -- C counterpart, and to transform polymorphic Haskell functions into C funtion
@@ -23,10 +23,11 @@ module Crypto.Lol.Cyclotomic.Tensor.CTensor.Backend
 import Control.Applicative
 
 import Crypto.Lol.Prelude       as LP (Complex, PP, Proxy (..), Tagged,
-                                       map, mapM_, proxy, tag, (++))
+                                       map, mapM_, proxy, tag, (++), retag)
 import Crypto.Lol.Reflects
 import Crypto.Lol.Types.RRq
 import Crypto.Lol.Types.ZqBasic
+import Crypto.Lol.Types.ZqProd
 
 import Data.Int
 import Data.Vector.Storable          as SV (Vector, fromList,
@@ -100,6 +101,7 @@ data RRqD
 
 type family CTypeOf x where
   CTypeOf (a,b) = CTypeOf a
+  CTypeOf (ZqProd qs Int64) = ZqB64D
   CTypeOf (ZqBasic (q :: k) Int64) = ZqB64D
   CTypeOf Double = DoubleD
   CTypeOf Int64 = Int64D
@@ -119,6 +121,19 @@ instance (Reflects q r, RealFrac r) => ZqTuple (RRq q r) where
   type ModPairs (RRq q r) = Int64
   getModuli = tag $ round (proxy value (Proxy::Proxy q) :: r)
 
+instance (Reflects q Int64) => ZqTuple (ZqProd '[q] Int64) where
+  type ModPairs (ZqProd '[q] Int64) = Int64
+  getModuli = retag (value :: Tagged q Int64)
+
+--would like to make ModPairs (ZqProd qs Int64) = [Int64], but that isn't Storable
+instance (Reflects q1 Int64, ZqTuple (ZqProd (q2 ': qs) Int64), Tuple (ZqProd (q1 ': q2 ': qs) Int64))
+  => ZqTuple (ZqProd (q1 ': q2 ': qs) Int64) where
+  type ModPairs (ZqProd (q1 ': q2 ': qs) Int64) = (Int64, ModPairs (ZqProd (q2 ': qs) Int64))
+  getModuli =
+    let q1 = proxy value (Proxy::Proxy q1)
+        qs = proxy getModuli (Proxy::Proxy (ZqProd (q2 ': qs) Int64))
+    in tag (q1, qs)
+
 instance (ZqTuple a, ZqTuple b) => ZqTuple (a, b) where
   type ModPairs (a,b) = (ModPairs a, ModPairs b)
   getModuli =
@@ -135,6 +150,9 @@ instance {-# Overlappable #-} Tuple a where
 
 instance (Tuple a, Tuple b) => Tuple (a,b) where
   numComponents = tag $ (proxy numComponents (Proxy::Proxy a)) + (proxy numComponents (Proxy::Proxy b))
+
+instance (Reflects qs [Int64]) => Tuple (ZqProd qs Int64) where
+  numComponents = retag $ fromIntegral <$> length <$> (value :: Tagged qs [Int64])
 
 -- | Single-argument synonym for @Dispatch'@.
 type Dispatch r = (Dispatch' (CTypeOf r) r)
@@ -164,8 +182,7 @@ class (repr ~ CTypeOf r) => Dispatch' repr r where
   -- | Equivalent to @zipWith (*)@
   dmul :: Ptr r -> Ptr r -> Int64 -> IO ()
 
-instance (ZqTuple r, Storable (ModPairs r), CTypeOf r ~ RRqD)
-  => Dispatch' RRqD r where
+instance (CTypeOf r ~ RRqD) => Dispatch' RRqD r where
   dcrt = error "cannot call CT CRT on type RRq"
   dcrtinv = error "cannot call CT CRTInv on type RRq"
   dl = error "cannot call CT L on type RRq (though you probably should be able to)"

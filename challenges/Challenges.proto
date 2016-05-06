@@ -14,7 +14,7 @@ message ContParams {                      // continuous RLWE parameters
 
 message DiscParams {                      // discrete RLWE parameters
   required int32 m                 = 1;   // cyclotomic index
-  required int64 q                 = 2;   // modulus
+  repeated int64 qs                = 2;   // moduli
   required double svar             = 3;   // scaled variance
   required int64 bound             = 4;   // gSqNorm error bound
   required int32 numSamples        = 5;   // number of samples
@@ -64,6 +64,6 @@ message Secret {                         // a secret for an RLWE/RLWE instance
   required int32 challengeID       = 1;
   required int32 instanceID        = 2;
   required int32 m                 = 3;
-  required int64 q                 = 4;
+  repeated int64 qs                = 4;
   required Rq s                    = 5;
 }

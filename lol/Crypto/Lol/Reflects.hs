@@ -1,6 +1,6 @@
-{-# LANGUAGE DataKinds, FlexibleContexts, FlexibleInstances,
-             KindSignatures, MultiParamTypeClasses, NoImplicitPrelude,
-             PolyKinds, ScopedTypeVariables, UndecidableInstances #-}
+{-# LANGUAGE DataKinds, FlexibleContexts, FlexibleInstances, KindSignatures,
+             MultiParamTypeClasses, NoImplicitPrelude, PolyKinds,
+             TypeOperators, ScopedTypeVariables, UndecidableInstances #-}
 
 -- | Generic interface for reflecting types to values.
 
@@ -53,3 +53,12 @@ instance (Fact m, ToInteger.C i) => Reflects m i where
 instance (Reifies q i, ToInteger.C i, Ring.C r)
   => Reflects (q :: *) r where
   value = tag $ fromIntegral $ reflect (Proxy::Proxy q)
+
+instance Reflects '[] [i] where
+  value = tag []
+
+instance (Reflects q i, Reflects qs [i]) => Reflects (q ': qs) [i] where
+  value =
+    let q = proxy value (Proxy::Proxy q)
+        qs = proxy value (Proxy::Proxy qs)
+    in tag $ q : qs

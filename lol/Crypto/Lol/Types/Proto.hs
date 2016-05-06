@@ -9,6 +9,7 @@ import Control.Monad.Except
 import Data.ByteString.Lazy hiding (map)
 import Data.Foldable (toList)
 import Data.Sequence (fromList)
+import Data.Word
 
 import Text.ProtocolBuffers        (messageGet, messagePut)
 import Text.ProtocolBuffers.Header
@@ -36,6 +37,21 @@ instance (Protoable a, Protoable b) => Protoable (a,b) where
     a' <- fromProto a
     b' <- fromProto b
     return (a',b')
+
+instance Protoable Int64 where
+  type ProtoType Int64 = Int64
+  toProto = id
+  fromProto = return
+
+instance Protoable Word64 where
+  type ProtoType Word64 = Word64
+  toProto = id
+  fromProto = return
+
+instance Protoable Double where
+  type ProtoType Double = Double
+  toProto = id
+  fromProto = return
 
 -- | Serialize a Haskell type to its protocol buffer 'ByteString'.
 msgPut :: (ReflectDescriptor (ProtoType a), Wire (ProtoType a), Protoable a)

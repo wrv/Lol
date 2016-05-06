@@ -55,12 +55,15 @@ import Crypto.Lol.Types.IZipVector
 import Crypto.Lol.Types.Proto
 import Crypto.Lol.Types.RRq
 import Crypto.Lol.Types.ZqBasic
+import Crypto.Lol.Types.ZqProd
 
 import Crypto.Proto.RLWE.Kq
 import Crypto.Proto.RLWE.Rq
+import qualified Crypto.Proto.RLWE.ZqProd as P
 
 import Data.Foldable as F
 import Data.Sequence as S (fromList)
+import Data.Word
 
 import System.IO.Unsafe (unsafePerformIO)
 
@@ -87,28 +90,36 @@ instance Eq r => Eq (CT m r) where
   x@(CT _) == y = x == toCT y
   y == x@(CT _) = x == toCT y
 
-instance (Fact m, Reflects q Int64) => Protoable (CT m (ZqBasic q Int64)) where
-  type ProtoType (CT m (ZqBasic q Int64)) = Rq
+instance (Reflects qs [Int64], Fact m, Storable (ZqProd qs Int64),
+          Protoable (ZqProd qs Int64), ProtoType (ZqProd qs Int64) ~ P.ZqProd)
+  => Protoable (CT m (ZqProd qs Int64)) where
+  type ProtoType (CT m (ZqProd qs Int64)) = Rq
 
   toProto (CT (CT' xs)) =
     let m = fromIntegral $ proxy valueFact (Proxy::Proxy m)
-        q = proxy value (Proxy::Proxy q) :: Int64
-    in Rq m (fromIntegral q) $ S.fromList $ SV.toList $ SV.map LP.lift xs
+        qs = proxy value (Proxy::Proxy qs) :: [Int64]
+    in Rq m (toProto $ (LP.map fromIntegral qs :: [Word64])) $ toProto $ SV.toList xs
   toProto x@(ZV _) = toProto $ toCT x
 
-  fromProto (Rq m' q' xs) =
+  fromProto (Rq m' qs'' xs') = do
     let m = proxy valueFact (Proxy::Proxy m) :: Int
-        q = proxy value (Proxy::Proxy q) :: Int64
+        qs = proxy value (Proxy::Proxy qs) :: [Int64]
         n = proxy totientFact (Proxy::Proxy m)
-        xs' = SV.fromList $ F.toList xs
-        len = F.length xs
-    in if m == fromIntegral m' && len == n && fromIntegral q == q'
-       then return $ CT $ CT' $ SV.map reduce xs'
-       else throwError $
-            "An error occurred while reading the proto type for CT.\n\
-            \Expected m=" ++ show m ++ ", got " ++ show m' ++ "\n\
-            \Expected n=" ++ show n ++ ", got " ++ show len ++ "\n\
-            \Expected q=" ++ show q ++ ", got " ++ show q' ++ "."
+        len = F.length xs'
+    qs' :: [Word64] <- fromProto qs''
+    xs <- SV.fromList <$> fromProto xs'
+    unless (m == fromIntegral m' && len == n && qs == (LP.map fromIntegral qs')) $
+      throwError $ "An error occurred while reading the proto type for RT.\n\
+        \Expected m=" ++ show m ++ ", got " ++ show m' ++ "\n\
+        \Expected n=" ++ show n ++ ", got " ++ show len ++ "\n\
+        \Expected qs=" ++ show qs ++ ", got " ++ show qs' ++ "."
+    return $ CT $ CT' xs
+
+instance (Protoable (CT m (ZqProd '[q] Int64)), Fact m) =>
+  Protoable (CT m (ZqBasic q Int64)) where
+  type ProtoType (CT m (ZqBasic q Int64)) = ProtoType (CT m (ZqProd '[q] Int64))
+  toProto x = toProto $ fromZqBasic <$> x
+  fromProto x = fmap toZqBasic <$> fromProto x
 
 instance (Fact m, Reflects q Double) => Protoable (CT m (RRq q Double)) where
   type ProtoType (CT m (RRq q Double)) = Kq
