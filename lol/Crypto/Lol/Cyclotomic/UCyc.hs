@@ -525,7 +525,7 @@ crtSet =
       pm = Proxy::Proxy m
       pm' = Proxy::Proxy m'
   in retag (fmap (embedPow .
-                  (if e > 1 then toPowCE . (^(p^(e-1))) . toCRT else toPow) .
+                  (if e > 1 then toPowCE . (^*(p^*(e-1))) . toCRT else toPow) .
                   Dec . fmapT liftZp) <$>
             (crtSetDec :: Tagged mbar [t m'bar (ZpOf r)]))
      \\ pFreeDivides pp pm pm' \\ pSplitTheorems pp pm \\ pSplitTheorems pp pm'

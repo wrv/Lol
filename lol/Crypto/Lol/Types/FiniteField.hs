@@ -21,7 +21,7 @@ module Crypto.Lol.Types.FiniteField
 ( GF                            -- export type but not constructor
 , PrimeField, GFCtx
 , size, trace, toList, fromList
-, IrreduciblePoly(..), X(..), (^^)
+, IrreduciblePoly(..)
 , TensorCoeffs(..)
 ) where
 
@@ -91,7 +91,7 @@ instance (GFCtx fp d) => CRTrans Maybe (GF fp d) where
             mval = proxy value (Proxy :: Proxy m)
             (q,r) = (size'-1) `quotRem` mval
             gen = head $ filter isPrimitive values
-            omega = gen^q
+            omega = gen^*q
             omegaPows = V.iterateN mval (*omega) one
         in if r == 0
            then Just $ (omegaPows V.!) . (`mod` mval)
@@ -143,14 +143,14 @@ sizePP = tag (proxy valuePrime (Proxy::Proxy (CharOf fp)),
 
 -- | The order of the field: @size (GF fp d) = @\( p^d \)
 size :: (GFCtx fp d) => Tagged (GF fp d) Int
-size = uncurry (^) <$> sizePP
+size = uncurry (^*) <$> sizePP
 
 isPrimitive :: forall fp d . (GFCtx fp d) => GF fp d -> Bool
 isPrimitive = let q = proxy size (Proxy :: Proxy (GF fp d))
                   ps = map (fromIntegral . fst) $ factorise $
                        fromIntegral $ q-1
                   exps = map ((q-1) `div`) ps
-              in \g -> not (isZero g) && all (\e -> g^e /= 1) exps
+              in \g -> not (isZero g) && all (\e -> g^*e /= 1) exps
 
 dotp :: (Ring a) => [a] -> [a] -> a
 dotp a b = sum $ zipWith (*) a b
@@ -168,13 +168,13 @@ powTraces =
   --          ", d = " ++ show (proxy value (Proxy::Proxy d) :: Int)) $
   let d = proxy value (Proxy :: Proxy d)
   in tag $ map trace' $ take d $
-     iterate (* GF (X ^^ 1)) (one :: GF fp d)
+     iterate (* GF (fromCoeffs [0,1])) (one :: GF fp d)
 
 -- helper that computes trace via brute force: sum frobenius
 -- automorphisms
 trace' :: (GFCtx fp d) => GF fp d -> fp
 trace' e = let (p,d) = witness sizePP e
-               (GF t) = sum $ take d $ iterate (^p) e
+               (GF t) = sum $ take d $ iterate (^*p) e
                -- t is a constant polynomial
            in head $ coeffs t
 
@@ -184,11 +184,3 @@ trace' e = let (p,d) = witness sizePP e
 -- "Crypto.Lol.Types".)
 class Field fp => IrreduciblePoly fp where
   irreduciblePoly :: (Reflects d Int) => Tagged d (Polynomial fp)
-
--- | Convenience data type for writing 'IrreduciblePoly' instances.
-data X = X
-
--- | Convenience function for writing 'IrreduciblePoly' instances.
-(^^) :: Ring a => X -> Int -> Polynomial a
-X ^^ i | i >= 0 = fromCoeffs $ replicate i 0 ++ [1]
-_ ^^ _ = error "FiniteField.(^^) only defined for non-negative exponents."

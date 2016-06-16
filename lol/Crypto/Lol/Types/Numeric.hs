@@ -26,7 +26,7 @@ import Control.DeepSeq
 import Control.Monad.Random
 
 -- NumericPrelude has silly types for these functions
-import           NumericPrelude         hiding (abs, max, min, (^))
+import           NumericPrelude         hiding (abs, max, min)
 import qualified NumericPrelude.Numeric (abs)
 import qualified Prelude                (max, min)
 
@@ -154,14 +154,14 @@ instance (NFData r) => NFData (Polynomial r) where
 -- | Our custom exponentiation, overriding NP's version that
 -- requires 'Integer' exponent.
 -- Copied from http://hackage.haskell.org/package/base-4.7.0.0/docs/src/GHC-Real.html#%5E
-{-# SPECIALISE [1] (^) ::
+{-# SPECIALISE [1] (^*) ::
         Integer -> Integer -> Integer,
         Integer -> Int -> Integer,
         Int -> Int -> Int,
         Int64 -> Int64 -> Int64
   #-}
-(^) :: forall a i . (Ring a, ToInteger i) => a -> i -> a
-x0 ^ y0 | y0 < 0    = error "Negative exponent"
+(^*) :: forall a i . (Ring a, ToInteger i) => a -> i -> a
+x0 ^* y0 | y0 < 0    = error "Negative exponent"
         | y0 == 0   = 1
         | otherwise = f x0 y0
     where -- f : x0 ^ y0 = x ^ y

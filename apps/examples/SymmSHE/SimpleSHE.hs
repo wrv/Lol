@@ -5,12 +5,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell     #-}
 
-import           Crypto.Lol hiding ((^))
+import           Crypto.Lol
 import           Crypto.Lol.Applications.SymmSHE -- exports *ciphertext* 'CT'
 import           Crypto.Lol.Types hiding (CT)
 import qualified Crypto.Lol.Types as C -- the *tensor* 'CT'
-
-import Algebra.Ring ((^))
 
 import Control.Monad.Random (getRandom)
 

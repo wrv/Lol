@@ -13,6 +13,16 @@ import Crypto.Lol.Types.FiniteField hiding (fromList)
 import Data.Map hiding (map)
 import Data.Maybe (fromMaybe)
 
+import MathObj.Polynomial (fromCoeffs)
+
+-- Convenience data type for writing 'IrreduciblePoly' instances.
+data X = X
+
+-- Convenience function for writing 'IrreduciblePoly' instances.
+(*^) :: Ring a => X -> Int -> Polynomial a
+X *^ i | i >= 0 = fromCoeffs $ replicate i 0 ++ [1]
+_ *^ _ = error "FiniteField.(*^) only defined for non-negative exponents."
+
 instance (CharOf a ~ Prime2, Field a) => IrreduciblePoly a where
   irreduciblePoly = do
     n <- value
@@ -28,7 +38,7 @@ polyMap :: (Ring fp) => Map Int (Polynomial fp)
 polyMap = fromList $ map (\xs -> (head xs, coeffsToPoly xs)) coeffs
 
 coeffsToPoly :: (Ring fp) => [Int] -> Polynomial fp
-coeffsToPoly xs = (sum $ map (X^^) xs) + 1
+coeffsToPoly xs = (sum $ map (X*^) xs) + 1
 
 -- The list below is small portion of the table
 -- "Table of Low-Weight binary Irreducible Polynomials" at

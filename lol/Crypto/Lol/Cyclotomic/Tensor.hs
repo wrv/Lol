@@ -343,7 +343,7 @@ digitRev (_,0) 0 = 0
 -- CJP: use accumulator to avoid multiple exponentiations?
 digitRev (p,e) j
   | e >= 1 = let (q,r) = j `divMod` p
-             in r * (p^(e-1)) + digitRev (p,e-1) q
+             in r * (p^*(e-1)) + digitRev (p,e-1) q
 
 indexToPowPPow, indexToZmsPPow :: PPow pp => Tagged pp (Int -> Int)
 indexToPowPPow = indexToPow <$> ppPPow
@@ -358,7 +358,7 @@ zmsToIndexFact = zmsToIndex <$> ppsFact
 indexToPow :: PP -> Int -> Int
 -- CJP: use accumulator to avoid multiple exponentiations?
 indexToPow (p,e) j = let (jq,jr) = j `divMod` (p-1)
-                     in p^(e-1)*jr + digitRev (p,e-1) jq
+                     in p^*(e-1)*jr + digitRev (p,e-1) jq
 
 -- | For a prime power \(p^e\), map a tensor index to the corresponding
 -- element \(i \in \Z_{p^e}^*\).

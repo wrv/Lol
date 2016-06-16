@@ -471,7 +471,7 @@ ru = do
   wPow <- fst <$> crtInfo
   LP.map
     (\(p,e) -> do
-        let pp = p^e
+        let pp = p^*e
             pow = mval `div` pp
         generate pp (wPow . (*pow))) <$>
       pureT ppsFact
@@ -481,7 +481,7 @@ ruInv = do
   wPow <- fst <$> crtInfo
   LP.map
     (\(p,e) -> do
-        let pp = p^e
+        let pp = p^*e
             pow = mval `div` pp
         generate pp (\i -> wPow $ -i*pow)) <$>
       pureT ppsFact
