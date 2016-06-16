@@ -1,24 +1,28 @@
+{-# LANGUAGE NoImplicitPrelude, RebindableSyntax #-}
 
 import Utils
+import Crypto.Lol
 
 -- number of ring-LWE samples
-rlwel=[3,1000]
+rlwel=[3,1000] :: [Int]
 
 -- number of ring-LWR samples
-rlwrl=[3,100000]
+rlwrl=[3,100000] :: [Int]
 
-rlweq :: forall m . (Fact m) => Proxy m -> Double -> [Int]
-rlweq _ v =
-  let mhat = proxy valueHatFact (Proxy::Proxy m)
-      n = proxy totientFact (Proxy::Proxy m)
+rlweq :: Factored -> Double -> [Int]
+rlweq m v =
+  let mval = valueF m
+      mhat = fromIntegral $ valueHatF m
+      n = fromIntegral $ totientF m
       r = sqrt v
-      qmin = 8*sqrt((v+2*pi)(2*mhat^2*(r+1)^2+1)*n)
-  in [head $ goodQs m qmin, head $ goodQs m (qmin*100)]
+      qmin = 8*sqrt((v+2*pi)*(2*mhat^2*(r+1)^2+1)*n) :: Double
+      qmin' = ceiling qmin
+  in [head $ goodQs mval qmin', head $ goodQs mval (qmin'*100)]
 
-rlwev :: forall m . (Fact m) => Proxy m -> Int -> [Double]
-rlwev _ l =
-  let n' = fromIntegral $ proxy totientFact (Proxy::Proxy m) :: Double
-      l' = fromIntegral n
+rlwev :: Factored -> Int -> [Double]
+rlwev m l =
+  let n' = fromIntegral $ totientF m :: Double
+      l' = fromIntegral l
   in [16/n',                          -- narrow
       36/n',                          -- narrow
       64/n',                          -- narrow
@@ -27,6 +31,7 @@ rlwev _ l =
       25*(sqrt $ n'*l'/(log $ n'*l')) -- worst-case hard
      ]
 
+ms :: [Int]
 ms = let maxPow2 = 7
          maxPow3 = 4
          maxPow5 = 3
