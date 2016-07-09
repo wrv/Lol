@@ -1,15 +1,11 @@
 
-import CycBenches
 import TensorBenches
 import UCycBenches
-import ZqBenches
 
 import Criterion.Main
 
 main :: IO ()
-main = defaultMain =<< sequence [
-  zqBenches,
+main = defaultMain [
   tensorBenches,
-  ucycBenches,
-  cycBenches
+  ucycBenches
   ]

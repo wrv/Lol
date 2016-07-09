@@ -21,18 +21,18 @@ import Data.Singletons.TypeRepStar ()
 
 cycBenches :: IO Benchmark
 cycBenches = benchGroup "Cyc" [
-  benchGroup "unzipCycPow" $ applyUnzip  allParams    $ hideArgs bench_unzipCycPow,
+  {-benchGroup "unzipCycPow" $ applyUnzip  allParams    $ hideArgs bench_unzipCycPow,
   benchGroup "unzipCycCRT" $ applyUnzip  allParams    $ hideArgs bench_unzipCycCRT,
-  benchGroup "*"           $ applyBasic  allParams    $ hideArgs bench_mul,
+  benchGroup "*"           $ applyBasic  allParams    $ hideArgs bench_mul,-}
   benchGroup "crt"         $ applyBasic  allParams    $ hideArgs bench_crt,
-  benchGroup "crtInv"      $ applyBasic  allParams    $ hideArgs bench_crtInv,
-  benchGroup "l"           $ applyBasic  allParams    $ hideArgs bench_l,
-  benchGroup "*g Pow"      $ applyBasic  allParams    $ hideArgs bench_mulgPow,
+  --benchGroup "crtInv"      $ applyBasic  allParams    $ hideArgs bench_crtInv,
+  benchGroup "l"           $ applyBasic  allParams    $ hideArgs bench_l
+  {-benchGroup "*g Pow"      $ applyBasic  allParams    $ hideArgs bench_mulgPow,
   benchGroup "*g CRT"      $ applyBasic  allParams    $ hideArgs bench_mulgCRT,
   benchGroup "lift"        $ applyLift   liftParams   $ hideArgs bench_liftPow,
   benchGroup "error"       $ applyError  errorParams  $ hideArgs $ bench_errRounded 0.1,
   benchGroup "twace"       $ applyTwoIdx twoIdxParams $ hideArgs bench_twacePow,
-  benchGroup "embed"       $ applyTwoIdx twoIdxParams $ hideArgs bench_embedPow
+  benchGroup "embed"       $ applyTwoIdx twoIdxParams $ hideArgs bench_embedPow-}
   ]
 
 bench_unzipCycPow :: (UnzipCtx t m r) => Cyc t m (r,r) -> Bench '(t,m,r)
@@ -96,13 +96,18 @@ bench_embedPow x =
   in bench (embed :: Cyc t m r -> Cyc t m' r) y
 
 type Tensors = '[CT,RT]
-type MRCombos =
+{-type MRCombos =
   '[ '(F1024, Zq 1051649),      -- 1024 / 512
      '(F2048, Zq 1054721),      -- 2048 / 1024
      '(F64 * F27, Zq 1048897),  -- 1728 / 576
      '(F64 * F81, Zq 1073089),  -- 5184 / 1728
      '(F64*F9*F25, Zq 1065601)  -- 14400 / 3840
     ]
+-}
+type MRCombos = '[ '(F128, Zq 257),
+                   '(F32 * F9, Zq 577),
+                   '(F1024, Zq 12289),
+                   '(F1024 * F4, Zq 12289) ]
 
 type MM'RCombos =
   '[ '(F8 * F91, F8 * F91 * F4, Zq 8737),
