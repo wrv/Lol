@@ -5,12 +5,13 @@
 
 module UCycBenches (ucycBenches) where
 
-import Crypto.Lol
+import Crypto.Lol.Prelude
 import Crypto.Lol.Cyclotomic.UCyc
-import Crypto.Lol.Types
+import Crypto.Lol.Cyclotomic.Tensor.CTensor    as X
+import Crypto.Lol.Cyclotomic.Tensor.RepaTensor as X
+import Crypto.Lol.Types.ZqBasic                as X
 
 import Criterion
-import Control.Monad.Random
 
 ucycBenches :: Benchmark
 ucycBenches =

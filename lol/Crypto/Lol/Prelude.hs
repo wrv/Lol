@@ -47,7 +47,6 @@ module Crypto.Lol.Prelude
 ) where
 
 import Crypto.Lol.Factored
-import Crypto.Lol.Types.Complex
 import Crypto.Lol.Types.Numeric
 
 import Algebra.Field          as Field (C)

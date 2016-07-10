@@ -71,12 +71,7 @@ library
   -- first comes first in the list. However `stack ghci` always links alphabetically,
   -- so we really just have to define `Zq::q` in the first file alphabetically.
   C-sources: Crypto/Lol/Cyclotomic/Tensor/CTensor/common.cpp,
-             Crypto/Lol/Cyclotomic/Tensor/CTensor/crt.cpp,
-             Crypto/Lol/Cyclotomic/Tensor/CTensor/g.cpp,
              Crypto/Lol/Cyclotomic/Tensor/CTensor/l.cpp,
-             Crypto/Lol/Cyclotomic/Tensor/CTensor/mul.cpp,
-             Crypto/Lol/Cyclotomic/Tensor/CTensor/norm.cpp,
-             Crypto/Lol/Cyclotomic/Tensor/CTensor/random.cpp,
              Crypto/Lol/Cyclotomic/Tensor/CTensor/zq.cpp
 
   if flag(llvm)
@@ -84,62 +79,29 @@ library
 
   -- ghc optimizations
   if flag(opt)
-    ghc-options: -O3 -Odph -funbox-strict-fields -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000
+    ghc-options: -O3 -Wall -Odph -funbox-strict-fields -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000
 
   exposed-modules:
-    Crypto.Lol
-    Crypto.Lol.Types
     Crypto.Lol.Factored
     Crypto.Lol.Reflects
-    Crypto.Lol.CRTrans
-    Crypto.Lol.Gadget
     Crypto.Lol.Prelude
 
-    Crypto.Lol.Cyclotomic.Cyc
     Crypto.Lol.Cyclotomic.UCyc
-    Crypto.Lol.Cyclotomic.RescaleCyc
-    Crypto.Lol.Cyclotomic.Linear
-
-    Crypto.Lol.RLWE.Continuous
-    Crypto.Lol.RLWE.Discrete
-    Crypto.Lol.RLWE.RLWR
 
     Crypto.Lol.Cyclotomic.Tensor
     Crypto.Lol.Cyclotomic.Tensor.CTensor
     Crypto.Lol.Cyclotomic.Tensor.RepaTensor
 
-    Crypto.Lol.Types.Random
-    Crypto.Lol.Types.FiniteField
-    Crypto.Lol.Types.IrreducibleChar2
-    Crypto.Lol.Types.Proto
-    Crypto.Lol.Types.RRq
-    Crypto.Lol.Types.ZPP
     Crypto.Lol.Types.ZqBasic
-
-    Crypto.Proto.RLWE
-    Crypto.Proto.RLWE.Rq
-    Crypto.Proto.RLWE.Kq
-    Crypto.Proto.RLWE.SampleCont
-    Crypto.Proto.RLWE.SampleDisc
-    Crypto.Proto.RLWE.SampleRLWR
 
   other-modules:
 
     Crypto.Lol.PosBin
     Crypto.Lol.FactoredDefs
     Crypto.Lol.PosBinDefs
-    Crypto.Lol.GaussRandom
-    Crypto.Lol.Types.ZmStar
-    Crypto.Lol.Types.Complex
     Crypto.Lol.Types.Numeric
-    Crypto.Lol.Types.IZipVector
-    Crypto.Lol.Cyclotomic.CRTSentinel
-    Crypto.Lol.Cyclotomic.Tensor.RepaTensor.CRT
-    Crypto.Lol.Cyclotomic.Tensor.RepaTensor.Extension
-    Crypto.Lol.Cyclotomic.Tensor.RepaTensor.Dec
     Crypto.Lol.Cyclotomic.Tensor.RepaTensor.GL
     Crypto.Lol.Cyclotomic.Tensor.RepaTensor.RTCommon
-    Crypto.Lol.Cyclotomic.Tensor.CTensor.Extension
     Crypto.Lol.Cyclotomic.Tensor.CTensor.Backend
 
   build-depends:
@@ -173,34 +135,9 @@ library
 
   other-extensions: TemplateHaskell
 
-test-suite test-lol
-  type:               exitcode-stdio-1.0
-  hs-source-dirs:     tests,utils
-  default-language:   Haskell2010
-  main-is:            Main.hs
-
-  ghc-options: -threaded -rtsopts
-
-  build-depends:
-    arithmoi,
-    base,
-    constraints,
-    deepseq,
-    DRBG,
-    lol,
-    MonadRandom,
-    mtl,
-    QuickCheck >= 2.8 && < 2.9,
-    random,
-    repa,
-    singletons,
-    test-framework >= 0.8 && < 0.9,
-    test-framework-quickcheck2 >= 0.3 && < 0.4,
-    vector
-
 Benchmark bench-lol
   type:               exitcode-stdio-1.0
-  hs-source-dirs:     benchmarks,utils
+  hs-source-dirs:     benchmarks
   default-language:   Haskell2010
   main-is:            Main.hs
 
@@ -210,7 +147,7 @@ Benchmark bench-lol
   ghc-options: -O3 -Odph -funbox-strict-fields -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000
   -- ghc-options: -O2 -Odph -funbox-strict-fields -fwarn-dodgy-imports -rtsopts
   -- ghc-options: -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000
-  ghc-options: -dcore-lint -ddump-to-file -ddump-core-stats -ddump-rules -ddump-simpl -dsuppress-uniques -dsuppress-module-prefixes
+  -- ghc-options: -dcore-lint -ddump-to-file -ddump-core-stats -ddump-rule-firings -ddump-rules -ddump-simpl -dsuppress-uniques -dsuppress-module-prefixes
   build-depends:
     arithmoi,
     base,
