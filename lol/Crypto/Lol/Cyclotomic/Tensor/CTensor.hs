@@ -24,18 +24,15 @@
 module Crypto.Lol.Cyclotomic.Tensor.CTensor
 ( CT ) where
 
-import Algebra.Additive     as Additive (C)
-
 import Control.Applicative    hiding ((*>))
 import Control.DeepSeq
 import Control.Monad.Except
 
-import Data.Coerce
 import Data.Constraint              hiding ((***))
 import Data.Int
 import Data.Vector.Storable         as SV (Vector,
                                            generate,
-                                           length, replicate,
+                                           length,
                                            thaw, thaw,
                                            unsafeFreeze,
                                            unsafeWith)
@@ -68,16 +65,6 @@ deriving instance Show r => Show (CT m r)
 
 wrap :: (Storable r) => (CT' l r -> CT' m r) -> (CT l r -> CT m r)
 wrap f (CT v) = CT $ f v
-
----------- NUMERIC PRELUDE INSTANCES ----------
-
--- CJP: Additive, Ring are not necessary when we use zipWithT
--- EAC: This has performance implications for the CT backend,
---      which used a (very fast) C function for (*) and (+)
-instance (Additive r, Storable r, Fact m)
-  => Additive.C (CT m r) where
-
-  zero = CT $ repl zero
 
 instance Tensor CT where
 
@@ -114,10 +101,6 @@ basicDispatch f = return $ unsafePerformIO . withBasicArgs f
 
 instance NFData (CT m r) where
   rnf (CT v) = rnf v
-
-repl :: forall m r . (Fact m, Storable r) => r -> CT' m r
-repl = let n = proxy totientFact (Proxy::Proxy m)
-       in coerce . SV.replicate n
 
 scalarPow' :: forall m r . (Fact m, Additive r, Storable r) => r -> CT' m r
 -- constant-term coefficient is first entry wrt powerful basis

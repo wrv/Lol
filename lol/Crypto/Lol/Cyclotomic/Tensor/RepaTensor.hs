@@ -15,8 +15,6 @@ import Crypto.Lol.Cyclotomic.Tensor.RepaTensor.RTCommon  as RT hiding
                                                                 ((++))
 import Crypto.Lol.Prelude                                as LP
 
-import Algebra.Additive     as Additive (C)
-
 import Control.DeepSeq      (NFData (rnf))
 import Data.Constraint      hiding ((***))
 
@@ -43,9 +41,6 @@ instance Tensor RT where
   {-# INLINABLE entailNFDataT #-}
   {-# INLINABLE scalarPow #-}
   {-# INLINABLE l #-}
-
-instance (Unbox r, Additive (Arr m r)) => Additive.C (RT m r) where
-  zero = RT zero
 
 instance NFData (RT m r) where
   rnf (RT v) = rnf v

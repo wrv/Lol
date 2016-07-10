@@ -15,8 +15,8 @@ import Criterion
 
 tensorBenches :: Benchmark
 tensorBenches =
-  let x = zero :: RT F128 (ZqBasic 257 Int64)
-      y = zero :: CT F128 (ZqBasic 257 Int64)
+  let x = scalarPow zero :: RT F128 (ZqBasic 257 Int64)
+      y = scalarPow zero :: CT F128 (ZqBasic 257 Int64)
   in bgroup "Tensor" [
       bench "RT.l" $ nf l x,
       bench "CT.l" $ nf l y

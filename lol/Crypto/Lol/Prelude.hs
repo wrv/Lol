@@ -35,8 +35,6 @@ module Crypto.Lol.Prelude
 , CharOf
 -- * Numeric
 , module Crypto.Lol.Types.Numeric
--- * Complex
-, module Crypto.Lol.Types.Complex
 -- * Factored
 , module Crypto.Lol.Factored
 -- * Miscellaneous
