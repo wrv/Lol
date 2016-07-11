@@ -147,7 +147,7 @@ Benchmark bench-lol
   ghc-options: -O3 -Odph -funbox-strict-fields -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000
   -- ghc-options: -O2 -Odph -funbox-strict-fields -fwarn-dodgy-imports -rtsopts
   -- ghc-options: -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000
-  -- ghc-options: -dcore-lint -ddump-to-file -ddump-core-stats -ddump-rule-firings -ddump-rules -ddump-simpl -dsuppress-uniques -dsuppress-module-prefixes
+  ghc-options: -dcore-lint -ddump-to-file -ddump-core-stats -ddump-simpl -dsuppress-idinfo -dsuppress-coercions -dsuppress-type-applications -dsuppress-uniques -dsuppress-module-prefixes
   build-depends:
     arithmoi,
     base,
