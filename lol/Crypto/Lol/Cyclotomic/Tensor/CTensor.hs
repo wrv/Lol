@@ -9,18 +9,22 @@ import Control.DeepSeq
 
 import Data.Vector.Storable         as SV (Vector,
                                            generate,
-                                           length,
                                            thaw, thaw,
-                                           unsafeFreeze,
-                                           unsafeWith)
+                                           unsafeFreeze)
 import Data.Vector.Storable.Mutable as SM hiding (replicate)
 
 import Crypto.Lol.FactoredDefs
-import Crypto.Lol.Cyclotomic.Tensor.CTensor.Backend
+import Control.Monad.ST
 import Data.Proxy
 import Data.Tagged
 import Data.Int
-import System.IO.Unsafe (unsafePerformIO)
+
+
+newtype UCyc (m :: Factored) = Dec (CT m) deriving (NFData)
+
+toPow :: (Fact m) => UCyc m -> UCyc m
+{-# INLINABLE toPow #-}
+toPow (Dec v) = Dec $ l v
 
 newtype CT (m :: Factored) = CT (Vector Int64) deriving (NFData)
 
@@ -37,17 +41,15 @@ wrap f (CT v) = CT $ untag f v
 ctl :: forall m . (Fact m)
   => Tagged m (Vector Int64 -> Vector Int64)
 ctl =
-  let factors = proxy (marshalFactors <$> ppsFact) (Proxy::Proxy m)
-      totm = proxy (fromIntegral <$> totientFact) (Proxy::Proxy m)
-      numFacts = fromIntegral $ SV.length factors
-  in return $ \x -> unsafePerformIO $ do
-    yout <- SV.thaw x
-    SM.unsafeWith yout (\pout ->
-      SV.unsafeWith factors (\pfac ->
-        dl pout totm pfac numFacts))
-    unsafeFreeze yout
+  let [(p,e)] = proxy (ppsFact) (Proxy::Proxy m)
+      totm = fromIntegral $ p*e*(proxy totientFact (Proxy::Proxy m))
+  in return $ \x -> runST $ do
+       yout <- SV.thaw x
+       SM.modify yout (+totm) 0
+       unsafeFreeze yout
 
 scalarPow' :: Int64 -> Vector Int64
 scalarPow' =
   let n = 64
   in \r -> generate n (\i -> if i == 0 then r else 0)
+

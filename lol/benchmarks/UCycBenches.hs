@@ -2,7 +2,6 @@
 module UCycBenches (ucycBenches) where
 
 import Crypto.Lol.FactoredDefs
-import Crypto.Lol.Cyclotomic.UCyc
 import Crypto.Lol.Cyclotomic.Tensor.CTensor
 import Criterion
 

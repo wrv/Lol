@@ -1,9 +1,12 @@
-{-# LANGUAGE ConstraintKinds, DataKinds, ExplicitNamespaces, GADTs,
-             InstanceSigs, KindSignatures, PolyKinds, ScopedTypeVariables,
-             RankNTypes, TemplateHaskell, TypeFamilies, TypeOperators,
-             UndecidableInstances #-}
-{-# OPTIONS_GHC -fno-warn-unused-binds #-}
-{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+{-# LANGUAGE ConstraintKinds      #-}
+{-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE PolyKinds            #-}
+{-# LANGUAGE RankNTypes           #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | This sub-module exists only because we can't define and use
 -- template Haskell splices in the same module.
