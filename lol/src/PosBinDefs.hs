@@ -3,7 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies    #-}
 
-module Crypto.Lol.PosBinDefs where
+module PosBinDefs where
 
 import Data.Singletons.TH
 singletons [d|

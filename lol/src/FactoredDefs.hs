@@ -11,9 +11,9 @@
 -- | This sub-module exists only because we can't define and use
 -- template Haskell splices in the same module.
 
-module Crypto.Lol.FactoredDefs where
+module FactoredDefs where
 
-import Crypto.Lol.PosBinDefs
+import PosBinDefs
 
 import Control.Arrow
 import Data.Tagged

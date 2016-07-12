@@ -3,22 +3,18 @@
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 
-module Crypto.Lol.Cyclotomic.Tensor.CTensor where
+module CTensor where
 
 import Control.DeepSeq
-
-import Data.Vector.Storable         as SV (Vector,
-                                           generate,
-                                           thaw, thaw,
-                                           unsafeFreeze)
-import Data.Vector.Storable.Mutable as SM hiding (replicate)
-
-import Crypto.Lol.FactoredDefs
 import Control.Monad.ST
+
+import Data.Int
 import Data.Proxy
 import Data.Tagged
-import Data.Int
+import Data.Vector.Storable as SV (Vector, generate, thaw, unsafeFreeze)
+import Data.Vector.Storable.Mutable as SM
 
+import FactoredDefs
 
 newtype UCyc (m :: Factored) = Dec (CT m) deriving (NFData)
 

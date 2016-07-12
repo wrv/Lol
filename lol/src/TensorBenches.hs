@@ -1,8 +1,8 @@
 
 module TensorBenches (tensorBenches) where
 
-import Crypto.Lol.FactoredDefs
-import Crypto.Lol.Cyclotomic.Tensor.CTensor    as X
+import FactoredDefs
+import CTensor
 
 import Criterion
 

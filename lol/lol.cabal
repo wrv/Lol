@@ -9,8 +9,6 @@ version:             0.4.0.0
 synopsis:            A library for lattice cryptography.
 homepage:            https://github.com/cpeikert/Lol
 Bug-Reports:         https://github.com/cpeikert/Lol/issues
-license:             GPL-2
-license-file:        LICENSE
 author:              Eric Crockett <ecrockett0@gmail.com>, Chris Peikert <cpeikert@alum.mit.edu>
 maintainer:          Eric Crockett <ecrockett0@gmail.com>
 copyright:           Eric Crockett, Chris Peikert
@@ -30,16 +28,17 @@ source-repository head
 library
   default-language:   Haskell2010
   ghc-options: -fwarn-dodgy-imports
+  hs-source-dirs: src
 
 
   ghc-options: -O3 -Wall -Odph -funbox-strict-fields -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000
 
   exposed-modules:
-    Crypto.Lol.Cyclotomic.Tensor.CTensor
-    Crypto.Lol.FactoredDefs
+    CTensor
+    FactoredDefs
 
   other-modules:
-    Crypto.Lol.PosBinDefs
+    PosBinDefs
 
   build-depends:
     base>=4.8 && <5,
@@ -48,9 +47,8 @@ library
     tagged,
     vector==0.11.*
 
-Benchmark bench-lol
-  type:               exitcode-stdio-1.0
-  hs-source-dirs:     benchmarks
+executable bench-lol
+  hs-source-dirs:     src
   default-language:   Haskell2010
   main-is:            Main.hs
 
@@ -59,4 +57,7 @@ Benchmark bench-lol
   build-depends:
     base,
     criterion,
-    lol
+    deepseq >= 1.4.1.1 && <1.5,
+    singletons >= 1.1.2.1 && < 2.2,
+    tagged,
+    vector==0.11.*

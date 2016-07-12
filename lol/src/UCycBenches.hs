@@ -1,8 +1,8 @@
 
 module UCycBenches (ucycBenches) where
 
-import Crypto.Lol.FactoredDefs
-import Crypto.Lol.Cyclotomic.Tensor.CTensor
+import FactoredDefs
+import CTensor
 import Criterion
 
 ucycBenches :: Benchmark
