@@ -1,6 +1,19 @@
 #include "types.h"
 #include "tensor.h"
 
+hDim_t ipow(hDim_t base, hShort_t exp)
+{
+  hDim_t result = 1;
+  while (exp) {
+    if (exp & 1) {
+      result *= base;
+    }
+    exp >>= 1;
+    base *= base;
+  }
+  return result;
+}
+
 template <typename ring> void lp (ring* y, hShort_t tupSize, hDim_t lts, hDim_t rts, hDim_t p)
 {
   hDim_t blockOffset;
@@ -44,13 +57,7 @@ template <typename ring> void lpInv (ring* y, hShort_t tupSize, hDim_t lts, hDim
   }
 }
 
-extern "C" void tensorLRq (hShort_t tupSize, Zq* y, hDim_t totm, PrimeExponent* peArr, hShort_t sizeOfPE, hInt_t* qs)
-{
-  tensorFuserPrime (y, tupSize, lp, totm, peArr, sizeOfPE, qs);
-  canonicalizeZq(y,tupSize,totm,qs);
-}
-
 extern "C" void tensorLR (hShort_t tupSize, hInt_t* y, hDim_t totm, PrimeExponent* peArr, hShort_t sizeOfPE)
 {
-  tensorFuserPrime (y, tupSize, lp, totm, peArr, sizeOfPE, (hInt_t*)0);
+  tensorFuserPrime (y, tupSize, lp, totm, peArr, sizeOfPE);
 }

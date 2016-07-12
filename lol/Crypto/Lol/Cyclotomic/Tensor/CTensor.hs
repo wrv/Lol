@@ -1,17 +1,13 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE GADTs               #-}
-{-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving  #-}
 {-# LANGUAGE TypeFamilies        #-}
 
-module Crypto.Lol.Cyclotomic.Tensor.CTensor
-( CT ) where
+module Crypto.Lol.Cyclotomic.Tensor.CTensor where
 
-import Control.Applicative    hiding ((*>))
 import Control.DeepSeq
 
-import Data.Constraint              hiding ((***))
 import Data.Vector.Storable         as SV (Vector,
                                            generate,
                                            length,
@@ -21,11 +17,10 @@ import Data.Vector.Storable         as SV (Vector,
 import Data.Vector.Storable.Mutable as SM hiding (replicate)
 
 import Crypto.Lol.Factored
-import Crypto.Lol.Cyclotomic.Tensor
 import Crypto.Lol.Cyclotomic.Tensor.CTensor.Backend
-import Crypto.Lol.Types.Numeric as LP hiding (replicate, unzip, zip)
-import Data.Tagged
 import Data.Proxy
+import Data.Tagged
+
 import System.IO.Unsafe (unsafePerformIO)
 
 -- | An implementation of 'Tensor' backed by C++ code.
@@ -36,18 +31,6 @@ deriving instance Show r => Show (CT m r)
 
 wrap :: (Storable r) => Tagged m (Vector r -> Vector r) -> (CT m r -> CT m r)
 wrap f (CT v) = CT $ untag f v
-
-instance Tensor CT where
-
-  type TElt CT r = (Storable r, Dispatch r)
-
-  entailNFDataT = Tagged $ Sub Dict
-  scalarPow = CT . scalarPow'
-  l = wrap ctl
-
-  {-# INLINABLE entailNFDataT #-}
-  {-# INLINABLE scalarPow #-}
-  {-# INLINABLE l #-}
 
 ctl :: forall m r . (Fact m, Storable r, Dispatch r)
   => Tagged m (Vector r -> Vector r)
@@ -65,8 +48,8 @@ ctl =
 instance NFData (CT m r) where
   rnf (CT v) = rnf v
 
-scalarPow' :: forall r . (Additive r, Storable r) => r -> Vector r
+scalarPow' :: forall r . (Num r, Storable r) => r -> Vector r
 -- constant-term coefficient is first entry wrt powerful basis
 scalarPow' =
   let n = 64 -- proxy totientFact (Proxy::Proxy m)
-  in \r -> generate n (\i -> if i == 0 then r else zero)
+  in \r -> generate n (\i -> if i == 0 then r else 0)

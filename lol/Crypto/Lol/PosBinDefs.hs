@@ -1,6 +1,6 @@
 {-# LANGUAGE ConstraintKinds, CPP, DataKinds, GADTs, InstanceSigs,
-             KindSignatures, NoImplicitPrelude, PolyKinds, RankNTypes,
-             RebindableSyntax, ScopedTypeVariables, TemplateHaskell,
+             KindSignatures, PolyKinds, RankNTypes,
+             ScopedTypeVariables, TemplateHaskell,
              TypeFamilies, UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-duplicate-exports #-}
 #if __GLASGOW_HASKELL__ >= 800
@@ -31,9 +31,6 @@ import Data.Singletons.Prelude
 import Data.Singletons.TH
 import Language.Haskell.TH
 
-import Algebra.ToInteger as ToInteger
-import NumericPrelude
-
 singletons [d|
             -- Positive naturals (1, 2, ...) in Peano representation.
             data Pos = O     -- one
@@ -60,9 +57,9 @@ singletons [d|
 -- not promotable due to numeric output
 
 -- | Convert a 'Pos' to an integral type.
-posToInt :: ToInteger.C z => Pos -> z
-posToInt O = one
-posToInt (S a) = one + posToInt a
+posToInt :: Integral z => Pos -> z
+posToInt O = 1
+posToInt (S a) = 1 + posToInt a
 
 singletons [d|
             -- Positive naturals in binary representation.
@@ -91,8 +88,8 @@ singletons [d|
            |]
 
 -- | Convert a 'Bin' to an integral type.
-binToInt :: ToInteger.C z => Bin -> z
-binToInt B1 = one
+binToInt :: Integral z => Bin -> z
+binToInt B1 = 1
 binToInt (D0 a) = 2 * binToInt a
 binToInt (D1 a) = 1 + 2 * binToInt a
 

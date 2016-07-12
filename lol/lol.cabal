@@ -51,9 +51,7 @@ library
   -- For `cabal repl`, we can simply reorder the list so that the file that should be linked
   -- first comes first in the list. However `stack ghci` always links alphabetically,
   -- so we really just have to define `Zq::q` in the first file alphabetically.
-  C-sources: Crypto/Lol/Cyclotomic/Tensor/CTensor/common.cpp,
-             Crypto/Lol/Cyclotomic/Tensor/CTensor/l.cpp,
-             Crypto/Lol/Cyclotomic/Tensor/CTensor/zq.cpp
+  C-sources: Crypto/Lol/Cyclotomic/Tensor/CTensor/l.cpp
 
   if flag(llvm)
     ghc-options: -fllvm -optlo-O3
@@ -64,10 +62,8 @@ library
 
   exposed-modules:
     Crypto.Lol.Factored
-    Crypto.Lol.Types.Numeric
     Crypto.Lol.Cyclotomic.UCyc
 
-    Crypto.Lol.Cyclotomic.Tensor
     Crypto.Lol.Cyclotomic.Tensor.CTensor
 
   other-modules:
@@ -82,7 +78,6 @@ library
     base>=4.8 && <5,
     constraints,
     deepseq >= 1.4.1.1 && <1.5,
-    numeric-prelude >= 0.4.2 && < 0.5,
     singletons >= 1.1.2.1 && < 2.2,
     storable-record >= 0.0.3 && < 0.1,
     tagged,
@@ -100,7 +95,7 @@ Benchmark bench-lol
   if flag(llvm)
     ghc-options: -fllvm -optlo-O3
   -- ghc-options: -threaded -rtsopts
-  ghc-options: -O3 -Odph -funbox-strict-fields -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000
+  ghc-options: -O3 -Wall -Odph -funbox-strict-fields -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000
   -- ghc-options: -O2 -Odph -funbox-strict-fields -fwarn-dodgy-imports -rtsopts
   -- ghc-options: -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000
   ghc-options: -dcore-lint -ddump-to-file -ddump-core-stats -ddump-simpl -dsuppress-idinfo -dsuppress-coercions -dsuppress-type-applications -dsuppress-uniques -dsuppress-module-prefixes
