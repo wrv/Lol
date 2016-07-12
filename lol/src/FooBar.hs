@@ -24,6 +24,7 @@ bar (Bar v) = Bar $ foo v
 
 newtype Foo (m :: Factored) = Foo (Vector Int64) deriving (NFData)
 
+{-# INLINABLE foo #-}
 foo :: forall m . (Fact m) => Foo m -> Foo m
 foo = let [(p,e)] = proxy ppsFact (Proxy::Proxy m)
           totm = fromIntegral $ p*e*(proxy totientFact (Proxy::Proxy m))

@@ -1,10 +1,9 @@
 
 module FooBenches where
 
+import Criterion
 import Factored
 import FooBar
-
-import Criterion
 
 benches :: Benchmark
 benches =
