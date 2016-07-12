@@ -1,11 +1,8 @@
 
-import TensorBenches
-import UCycBenches
+import FooBenches
+import BarBenches
 
 import Criterion.Main
 
 main :: IO ()
-main = defaultMain [
-  tensorBenches,
-  ucycBenches
-  ]
+main = defaultMain [FooBenches.benches, BarBenches.benches]

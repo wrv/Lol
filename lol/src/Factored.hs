@@ -11,9 +11,7 @@
 -- | This sub-module exists only because we can't define and use
 -- template Haskell splices in the same module.
 
-module FactoredDefs where
-
-import PosBinDefs
+module Factored where
 
 import Control.Arrow
 import Data.Tagged
@@ -21,6 +19,14 @@ import Data.Singletons.Prelude   hiding ((:-))
 import Data.Singletons.TH
 
 singletons [d|
+            -- Positive naturals (1, 2, ...) in Peano representation.
+            data Pos = O     -- one
+                     | S Pos -- successor
+
+            data Bin = B1       -- 1
+                     | D0 Bin   -- 2*b (double)
+                     | D1 Bin   -- 1 + 2*b (double and increment)
+
             -- restrict to primes
             newtype PrimeBin = P Bin
 
@@ -48,27 +54,45 @@ singletons [d|
 
             |]
 
+-- | Convert a 'Pos' to an integral type.
+--{-# INLINABLE posToInt #-}
+posToInt :: Integral z => Pos -> z
+posToInt O = 1
+posToInt (S a) = 1 + posToInt a
+
+-- | Convert a 'Bin' to an integral type.
+--{-# INLINABLE binToInt #-}
+binToInt :: Integral z => Bin -> z
+binToInt B1 = 1
+binToInt (D0 a) = 2 * binToInt a
+binToInt (D1 a) = 1 + 2 * binToInt a
+
 type Fact (m :: Factored) = SingI m
 
 -- | Type synonym for @(prime, exponent)@ pair.
 type PP = (Int, Int)
 
 -- | Value-level prime-power factorization tagged by a 'Factored' type.
+--{-# INLINABLE ppsFact #-}
 ppsFact :: forall m . Fact m => Tagged m [PP]
 ppsFact = Tagged $ map ppToPP $ unF $ fromSing (sing :: SFactored m)
 
+--{-# INLINABLE totientFact #-}
 totientFact :: Fact m => Tagged m Int
 totientFact = totientPPs <$> ppsFact
 
 -- | Conversion.
+--{-# INLINABLE ppToPP #-}
 ppToPP :: PrimePower -> PP
 ppToPP = (binToInt . unP *** posToInt) . unPP
 
 -- | Totient of a prime power.
+--{-# INLINABLE totientPP #-}
 totientPP :: PP -> Int
 totientPP (_,0) = 1
 totientPP (p,e) = (p-1)*(p^(e-1))
 
+--{-# INLINABLE totientPPs #-}
 totientPPs :: [PP] -> Int
 -- | Product of totients of individual 'PP's
 totientPPs = product . map totientPP

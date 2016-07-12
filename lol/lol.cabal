@@ -1,59 +1,15 @@
 name:                lol
--- The package version.  See the Haskell package versioning policy (PVP)
--- for standards guiding when and how versions should be incremented.
--- http://www.haskell.org/haskellwiki/Package_versioning_policy
--- PVP summary:      +-+------- breaking API changes
---                   | | +----- non-breaking API additions
---                   | | | +--- code changes with no API change
-version:             0.4.0.0
-synopsis:            A library for lattice cryptography.
-homepage:            https://github.com/cpeikert/Lol
-Bug-Reports:         https://github.com/cpeikert/Lol/issues
-author:              Eric Crockett <ecrockett0@gmail.com>, Chris Peikert <cpeikert@alum.mit.edu>
-maintainer:          Eric Crockett <ecrockett0@gmail.com>
-copyright:           Eric Crockett, Chris Peikert
-category:            Crypto
-stability:           experimental
 build-type:          Simple
 cabal-version:       >= 1.10
-description:
-    Λ ○ λ (Lol) is a general-purpose library for ring-based lattice cryptography.
-    For a detailed description of interfaces and functionality, see
-    <https://eprint.iacr.org/2015/1134 Λ ○ λ: A Functional Library for Lattice Cryptography>.
-    For example cryptographic applications, see <https://hackage.haskell.org/package/lol-apps lol-apps>.
-source-repository head
-  type: git
-  location: https://github.com/cpeikert/Lol
-
-library
-  default-language:   Haskell2010
-  ghc-options: -fwarn-dodgy-imports
-  hs-source-dirs: src
-
-
-  ghc-options: -O3 -Wall -Odph -funbox-strict-fields -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000
-
-  exposed-modules:
-    CTensor
-    FactoredDefs
-
-  other-modules:
-    PosBinDefs
-
-  build-depends:
-    base>=4.8 && <5,
-    deepseq >= 1.4.1.1 && <1.5,
-    singletons >= 1.1.2.1 && < 2.2,
-    tagged,
-    vector==0.11.*
+version:             0.4.0.0
 
 executable bench-lol
   hs-source-dirs:     src
   default-language:   Haskell2010
   main-is:            Main.hs
 
-  ghc-options: -O3 -Wall -Odph -funbox-strict-fields -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000
-  ghc-options: -dcore-lint -ddump-to-file -ddump-core-stats -ddump-simpl -dsuppress-idinfo -dsuppress-coercions -dsuppress-type-applications -dsuppress-uniques -dsuppress-module-prefixes
+  ghc-options: -O3
+  ghc-options: -ddump-to-file -ddump-simpl -dsuppress-coercions -dsuppress-type-applications -dsuppress-uniques -dsuppress-module-prefixes
   build-depends:
     base,
     criterion,
