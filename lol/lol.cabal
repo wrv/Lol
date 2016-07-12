@@ -61,30 +61,21 @@ library
     ghc-options: -O3 -Wall -Odph -funbox-strict-fields -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000
 
   exposed-modules:
-    Crypto.Lol.Factored
     Crypto.Lol.Cyclotomic.UCyc
-
     Crypto.Lol.Cyclotomic.Tensor.CTensor
+    Crypto.Lol.FactoredDefs
 
   other-modules:
-
-    Crypto.Lol.PosBin
-    Crypto.Lol.FactoredDefs
     Crypto.Lol.PosBinDefs
-
     Crypto.Lol.Cyclotomic.Tensor.CTensor.Backend
 
   build-depends:
     base>=4.8 && <5,
-    constraints,
     deepseq >= 1.4.1.1 && <1.5,
     singletons >= 1.1.2.1 && < 2.2,
     storable-record >= 0.0.3 && < 0.1,
     tagged,
-    template-haskell  >=  2.2.0.0,
     vector==0.11.*
-
-  other-extensions: TemplateHaskell
 
 Benchmark bench-lol
   type:               exitcode-stdio-1.0

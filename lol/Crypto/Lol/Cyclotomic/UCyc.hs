@@ -1,20 +1,16 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE KindSignatures    #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures             #-}
 
 module Crypto.Lol.Cyclotomic.UCyc where
 
-import Crypto.Lol.Factored
+import Crypto.Lol.FactoredDefs
 import Crypto.Lol.Cyclotomic.Tensor.CTensor
 
 import Control.DeepSeq
 
-import Data.Int
-
-data UCyc (m :: Factored) = Dec !(CT m Int64)
+newtype UCyc (m :: Factored) = Dec (CT m) deriving (NFData)
 
 toPow :: (Fact m) => UCyc m -> UCyc m
 {-# INLINABLE toPow #-}
-toPow (Dec v) = Dec $ wrap ctl v
-
-instance NFData (UCyc m) where
-  rnf (Dec x) = rnf x
+toPow (Dec v) = Dec $ l v

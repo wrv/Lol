@@ -33,10 +33,7 @@ store = Store.run $
 instance Show CPP where
     show (CPP p e) = "(" ++ show p ++ "," ++ show e ++ ")"
 
-class Dispatch r where
-  dl :: Ptr r -> Int64 -> Ptr CPP -> Int16 -> IO ()
-
-instance Dispatch Int64 where
-  dl pout = tensorLR 1 (castPtr pout)
+dl :: Ptr Int64 -> Int64 -> Ptr CPP -> Int16 -> IO ()
+dl pout = tensorLR 1 (castPtr pout)
 
 foreign import ccall unsafe "tensorLR" tensorLR :: Int16 -> Ptr Int64 -> Int64 -> Ptr CPP -> Int16 -> IO ()
