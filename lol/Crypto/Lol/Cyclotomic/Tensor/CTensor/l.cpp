@@ -54,34 +54,3 @@ extern "C" void tensorLR (hShort_t tupSize, hInt_t* y, hDim_t totm, PrimeExponen
 {
   tensorFuserPrime (y, tupSize, lp, totm, peArr, sizeOfPE, (hInt_t*)0);
 }
-
-extern "C" void tensorLDouble (hShort_t tupSize, double* y, hDim_t totm, PrimeExponent* peArr, hShort_t sizeOfPE)
-{
-  tensorFuserPrime (y, tupSize, lp, totm, peArr, sizeOfPE, (hInt_t*)0);
-}
-
-extern "C" void tensorLC (hShort_t tupSize, Complex* y, hDim_t totm, PrimeExponent* peArr, hShort_t sizeOfPE)
-{
-  tensorFuserPrime (y, tupSize, lp, totm, peArr, sizeOfPE, (hInt_t*)0);
-}
-
-extern "C" void tensorLInvRq (hShort_t tupSize, Zq* y, hDim_t totm, PrimeExponent* peArr, hShort_t sizeOfPE, hInt_t* qs)
-{
-  tensorFuserPrime (y, tupSize, lpInv, totm, peArr, sizeOfPE, qs);
-  canonicalizeZq(y,tupSize,totm,qs);
-}
-
-extern "C" void tensorLInvR (hShort_t tupSize, hInt_t* y, hDim_t totm, PrimeExponent* peArr, hShort_t sizeOfPE)
-{
-  tensorFuserPrime (y, tupSize, lpInv, totm, peArr, sizeOfPE, (hInt_t*)0);
-}
-
-extern "C" void tensorLInvDouble (hShort_t tupSize, double* y, hDim_t totm, PrimeExponent* peArr, hShort_t sizeOfPE)
-{
-  tensorFuserPrime (y, tupSize, lpInv, totm, peArr, sizeOfPE, (hInt_t*)0);
-}
-
-extern "C" void tensorLInvC (hShort_t tupSize, Complex* y, hDim_t totm, PrimeExponent* peArr, hShort_t sizeOfPE)
-{
-  tensorFuserPrime (y, tupSize, lpInv, totm, peArr, sizeOfPE, (hInt_t*)0);
-}

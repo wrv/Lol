@@ -17,25 +17,6 @@ copyright:           Eric Crockett, Chris Peikert
 category:            Crypto
 stability:           experimental
 build-type:          Simple
-extra-source-files:  README, CHANGES.md,
-                     benchmarks/CycBenches.hs,
-                     benchmarks/TensorBenches.hs,
-                     benchmarks/UCycBenches.hs,
-                     benchmarks/ZqBenches.hs,
-                     tests/CycTests.hs,
-                     tests/TensorTests.hs,
-                     tests/ZqTests.hs,
-                     utils/Apply.hs,
-                     utils/Apply/Cyc.hs,
-                     utils/Apply/Zq.hs,
-                     utils/Benchmarks.hs,
-                     utils/GenArgs.hs,
-                     utils/GenArgs/Zq.hs,
-                     utils/Tests.hs,
-                     utils/TestTypes.hs,
-                     utils/Utils.hs,
-                     Crypto/Lol/Cyclotomic/Tensor/CTensor/*.h,
-                     Crypto/Lol/Cyclotomic/Tensor/CTensor/*.cpp
 cabal-version:       >= 1.10
 description:
     Λ ○ λ (Lol) is a general-purpose library for ring-based lattice cryptography.
@@ -83,55 +64,30 @@ library
 
   exposed-modules:
     Crypto.Lol.Factored
-    Crypto.Lol.Reflects
-    Crypto.Lol.Prelude
-
+    Crypto.Lol.Types.Numeric
     Crypto.Lol.Cyclotomic.UCyc
 
     Crypto.Lol.Cyclotomic.Tensor
     Crypto.Lol.Cyclotomic.Tensor.CTensor
-    Crypto.Lol.Cyclotomic.Tensor.RepaTensor
-
-    Crypto.Lol.Types.ZqBasic
 
   other-modules:
 
     Crypto.Lol.PosBin
     Crypto.Lol.FactoredDefs
     Crypto.Lol.PosBinDefs
-    Crypto.Lol.Types.Numeric
-    Crypto.Lol.Cyclotomic.Tensor.RepaTensor.GL
-    Crypto.Lol.Cyclotomic.Tensor.RepaTensor.RTCommon
+
     Crypto.Lol.Cyclotomic.Tensor.CTensor.Backend
 
   build-depends:
-    arithmoi >= 0.4.1.3 && <0.5,
     base>=4.8 && <5,
-    binary,
-    bytestring,
     constraints,
-    containers >= 0.5.6.2 && < 0.6,
-    crypto-api,
-    data-default >= 0.3.0 && < 0.8,
     deepseq >= 1.4.1.1 && <1.5,
-    monadcryptorandom,
-    MonadRandom >= 0.2 && < 0.5,
-    mtl >= 2.2.1 && < 2.3,
     numeric-prelude >= 0.4.2 && < 0.5,
-    QuickCheck >= 2.8 && < 2.9,
-    protocol-buffers,
-    protocol-buffers-descriptor,
-    random >= 1.1 && < 1.2,
-    reflection >= 1.5.1 && < 2.2,
-    repa==3.4.*,
     singletons >= 1.1.2.1 && < 2.2,
     storable-record >= 0.0.3 && < 0.1,
-    th-desugar >= 1.5.4 && < 1.7,
-    tagged-transformer >= 0.7 && < 0.9,
+    tagged,
     template-haskell  >=  2.2.0.0,
-    transformers >= 0.4.2.0 && < 0.6,
-    vector==0.11.*,
-    vector-th-unbox >= 0.2.1.0 && < 0.3
+    vector==0.11.*
 
   other-extensions: TemplateHaskell
 
@@ -149,15 +105,6 @@ Benchmark bench-lol
   -- ghc-options: -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000
   ghc-options: -dcore-lint -ddump-to-file -ddump-core-stats -ddump-simpl -dsuppress-idinfo -dsuppress-coercions -dsuppress-type-applications -dsuppress-uniques -dsuppress-module-prefixes
   build-depends:
-    arithmoi,
     base,
     criterion,
-    deepseq,
-    DRBG,
-    lol,
-    MonadRandom,
-    mtl,
-    singletons,
-    transformers,
-    vector,
-    repa
+    lol

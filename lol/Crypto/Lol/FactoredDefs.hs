@@ -51,7 +51,7 @@ import Crypto.Lol.PosBin
 
 import Control.Arrow
 import Data.Constraint           hiding ((***), (&&&))
-import Data.Functor.Trans.Tagged
+import Data.Tagged
 import Data.List                 hiding ((\\))
 import Data.Singletons.Prelude   hiding ((:-))
 import Data.Singletons.TH
@@ -331,7 +331,7 @@ type PP = (Int, Int)
 
 -- | Value-level prime-power factorization tagged by a 'Factored' type.
 ppsFact :: forall m . Fact m => Tagged m [PP]
-ppsFact = tag $ map ppToPP $ unF $ fromSing (sing :: SFactored m)
+ppsFact = Tagged $ map ppToPP $ unF $ fromSing (sing :: SFactored m)
 
 valueFact, totientFact, valueHatFact, radicalFact, oddRadicalFact ::
   Fact m => Tagged m Int
@@ -354,7 +354,7 @@ oddRadicalFact = oddRadicalPPs <$> ppsFact
 
 -- | Reflect a 'PrimePower' type to a 'PP' value.
 ppPPow :: forall pp . PPow pp => Tagged pp PP
-ppPPow = tag $ ppToPP $ fromSing (sing :: SPrimePower pp)
+ppPPow = Tagged $ ppToPP $ fromSing (sing :: SPrimePower pp)
 
 primePPow, exponentPPow, valuePPow, totientPPow :: PPow pp => Tagged pp Int
 -- | Reflect the prime component of a 'PrimePower' type.
@@ -368,7 +368,7 @@ totientPPow = totientPP <$> ppPPow
 
 -- | The value of a 'PrimeBin' type.
 valuePrime :: forall p . Prime p => Tagged p Int
-valuePrime = tag $ binToInt $ unP $ fromSing (sing :: SPrimeBin p)
+valuePrime = Tagged $ binToInt $ unP $ fromSing (sing :: SPrimeBin p)
 
 -- | Return \( m \) if \( m \) is odd, and \( m/2 \) otherwise.
 valueHat :: Integral i => i -> i
