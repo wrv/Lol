@@ -534,9 +534,9 @@ crtSet =
 
 
 --------- Conversion methods ------------------
--- Used to be a problem in #12068
-{-# SPECIALIZE toPow :: (CRTEmbed r, CRTrans Maybe r, TElt CT r, CRTrans Identity (CRTExt r), TElt CT (CRTExt r), Fact m) => UCyc CT m rep r -> UCyc CT m P r #-}
-{-# SPECIALIZE toPow :: (CRTEmbed r, CRTrans Maybe r, TElt RT r, CRTrans Identity (CRTExt r), TElt RT (CRTExt r), Fact m) => UCyc RT m rep r -> UCyc RT m P r #-}
+-- Used to be a problem in #12068. Now we can write the rules, but do they fire?
+{-# SPECIALIZE toPow :: (Fact m, UCRTElt CT r) => UCyc CT m rep r -> UCyc CT m P r #-}
+{-# SPECIALIZE toPow :: (Fact m, UCRTElt RT r) => UCyc RT m rep r -> UCyc RT m P r #-}
 -- | Convert to powerful-basis representation.
 toPow :: (Fact m, UCRTElt t r) => UCyc t m rep r -> UCyc t m P r
 {-# INLINABLE toPow #-}
