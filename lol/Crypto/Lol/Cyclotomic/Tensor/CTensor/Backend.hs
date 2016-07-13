@@ -220,10 +220,10 @@ instance (ZqTuple r, Storable (ModPairs r), CTypeOf r ~ ZqB64D)
         numPairs = proxy numComponents (Proxy::Proxy r)
     in with qs $ \qsptr ->
         tensorCRTInvRq numPairs (castPtr pout) totm pfac numFacts (castPtr ruptr) (castPtr minv) (castPtr qsptr)
-  dl pout totm pfac numFacts =
+  dl =
     let qs = proxy getModuli (Proxy::Proxy r)
         numPairs = proxy numComponents (Proxy::Proxy r)
-    in with qs $ \qsptr ->
+    in \pout totm pfac numFacts -> with qs $ \qsptr ->
         tensorLRq numPairs (castPtr pout) totm pfac numFacts (castPtr qsptr)
   dlinv pout totm pfac numFacts =
     let qs = proxy getModuli (Proxy::Proxy r)
@@ -303,8 +303,7 @@ instance Dispatch' DoubleD Double where
 instance Dispatch' Int64D Int64 where
   dcrt = error "cannot call CT Crt on type Int64"
   dcrtinv = error "cannot call CT CrtInv on type Int64"
-  dl pout =
-    tensorLR 1 (castPtr pout)
+  dl = \pout -> tensorLR 1 (castPtr pout)
   dlinv pout =
     tensorLInvR 1 (castPtr pout)
   dnorm pout =

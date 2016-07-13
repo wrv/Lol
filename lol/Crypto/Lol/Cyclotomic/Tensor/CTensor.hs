@@ -251,15 +251,15 @@ instance Tensor CT where
   scalarPow = CT . scalarPow' -- Vector code
 
   l :: forall m r . (Additive r, Fact m, Storable r, Dispatch r) => CT m r -> CT m r
-  l = wrap l' -- wrap $ (coerce $ (basicDispatch dl :: Tagged m (CT' m r -> CT' m r)) :: CT' m r -> CT' m r) -- wrap l' --
-  lInv = wrap $ untag $ basicDispatch dlinv
+  l = wrap l' -- $ basicDispatch dl -- wrap l' --
+  lInv = wrap $ basicDispatch dlinv
 
   mulGPow = wrap mulGPow'
-  mulGDec = wrap $ untag $ basicDispatch dmulgdec
+  mulGDec = wrap $ basicDispatch dmulgdec
 
   divGPow = wrapM divGPow'
   -- we divide by p in the C code (for divGDec only(?)), do NOT call checkDiv!
-  divGDec = wrapM $ Just . untag (basicDispatch dginvdec)
+  divGDec = wrapM $ Just . basicDispatch dginvdec
 
   crtFuncs = (,,,,) <$>
     return (CT . repl) <*>
@@ -358,11 +358,11 @@ coerceBasis :: Tagged '(m,m') [Vector r] -> Tagged m [CT' m' r]
 coerceBasis = coerce
 
 mulGPow' :: (TElt CT r, Fact m) => CT' m r -> CT' m r
-mulGPow' = untag $ basicDispatch dmulgpow
+mulGPow' = basicDispatch dmulgpow
 
 divGPow' :: (TElt CT r, Fact m, IntegralDomain r, ZeroTestable r)
             => CT' m r -> Maybe (CT' m r)
-divGPow' = untag $ checkDiv $ basicDispatch dginvpow
+divGPow' = checkDiv $ basicDispatch dginvpow
 
 withBasicArgs :: forall m r . (Fact m, Storable r)
   => (Ptr r -> Int64 -> Ptr CPP -> Int16 -> IO ())
@@ -381,8 +381,8 @@ withBasicArgs f =
 {-# INLINE basicDispatch #-}
 basicDispatch :: (Storable r, Fact m)
                  => (Ptr r -> Int64 -> Ptr CPP -> Int16 -> IO ())
-                     -> Tagged m (CT' m r -> CT' m r)
-basicDispatch f = return $ unsafePerformIO . withBasicArgs f
+                     -> CT' m r -> CT' m r
+basicDispatch f = unsafePerformIO . withBasicArgs f
 
 gSqNormDec' :: (Storable r, Fact m, Dispatch r)
                => Tagged m (CT' m r -> r)
@@ -404,13 +404,12 @@ ctCRTInv = do
   return $ \x -> unsafePerformIO $
     withPtrArray ruinv' (\ruptr -> with mhatInv (flip withBasicArgs x . dcrtinv ruptr))
 
-checkDiv :: (Storable r, IntegralDomain r, ZeroTestable r, Fact m)
-    => Tagged m (CT' m r -> CT' m r) -> Tagged m (CT' m r -> Maybe (CT' m r))
-checkDiv f = do
-  f' <- f
-  oddRad' <- fromIntegral <$> oddRadicalFact
-  return $ \x ->
-    let (CT' y) = f' x
+checkDiv :: forall m r . (Storable r, IntegralDomain r, ZeroTestable r, Fact m)
+    => (CT' m r -> CT' m r) -> CT' m r -> Maybe (CT' m r)
+checkDiv f =
+  let oddRad' = fromIntegral $ proxy oddRadicalFact (Proxy::Proxy m)
+  in \x ->
+    let (CT' y) = f x
     in CT' <$> SV.mapM (`divIfDivis` oddRad') y
 
 divIfDivis :: (IntegralDomain r, ZeroTestable r) => r -> r -> Maybe r
