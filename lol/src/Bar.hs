@@ -4,14 +4,14 @@
 
 module Bar where
 
+import Control.DeepSeq
+
 import Factored
 import Foo
-import T
-import Control.DeepSeq
 
 newtype Bar t (m :: Factored) = Bar (t m) deriving (NFData)
 
---{-# SPECIALIZE bar :: (Fact m) => Bar Foo m -> Bar Foo m #-}
-bar :: (Fact m, T t) => Bar t m -> Bar t m
+{-# SPECIALIZE bar :: (Fact m) => Bar Foo m -> Bar Foo m #-}
 {-# INLINABLE bar #-}
-bar (Bar v) = Bar $ f v
+bar :: (Fact m, T t) => Bar t m -> Bar t m
+bar (Bar v) = Bar $ t v

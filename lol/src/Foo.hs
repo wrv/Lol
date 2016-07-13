@@ -11,27 +11,24 @@ import Control.Monad.ST
 import Data.Int
 import Data.Proxy
 import Data.Tagged
-import Data.Vector.Storable as SV (Vector, generate, thaw, unsafeFreeze)
-import Data.Vector.Storable.Mutable as SM
 
 import Factored
-import T
 
-newtype Foo (m :: Factored) = Foo (Vector Int64) deriving (NFData)
+newtype Foo (m :: Factored) = Foo Int64 deriving (NFData)
+
+class T t where
+  t :: (Fact m ) => t m -> t m
 
 instance T Foo where
-  f = foo
+  t = foo
+  {-# INLINABLE t #-}
 
 {-# INLINABLE foo #-}
 foo :: forall m . (Fact m) => Foo m -> Foo m
-foo = let [(p,e)] = proxy ppsFact (Proxy::Proxy m)
-          totm = fromIntegral $ p*e*(proxy totientFact (Proxy::Proxy m))
-      in \(Foo x) -> Foo $ runST $ do
-           yout <- SV.thaw x
-           SM.modify yout (+totm) 0
-           unsafeFreeze yout
+foo = let totm = fromIntegral $ (proxy totientFact (Proxy::Proxy m))
+      in \(Foo x) -> Foo $ x+totm
 
 scalarFoo :: forall m . (Fact m) => Int64 -> Foo m
 scalarFoo =
-  let n = proxy totientFact (Proxy::Proxy m)
-  in \r -> Foo $ generate n (\i -> if i == 0 then r else 0)
+  let n = fromIntegral $ proxy totientFact (Proxy::Proxy m)
+  in \r -> Foo $ r+n

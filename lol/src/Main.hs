@@ -1,8 +1,9 @@
 
-import FooBenches
-import BarBenches
+import FooBench
+import BarBench
+import TBench
 
 import Criterion.Main
 
 main :: IO ()
-main = defaultMain [FooBenches.benches, BarBenches.benches]
+main = defaultMain [FooBench.benches, TBench.benches, BarBench.benches]

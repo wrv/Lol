@@ -17,5 +17,4 @@ executable bench-test
     criterion,
     deepseq >= 1.4.1.1 && <1.5,
     singletons >= 1.1.2.1 && < 2.2,
-    tagged,
-    vector==0.11.*
+    tagged
