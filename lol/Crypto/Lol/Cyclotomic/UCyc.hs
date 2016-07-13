@@ -78,6 +78,8 @@ import Test.QuickCheck
 
 import Crypto.Lol.Types.Proto
 
+import GHC.Magic
+
 --import qualified Debug.Trace as DT
 
 -- | Nullary index type representing the powerful basis.
@@ -535,8 +537,8 @@ crtSet =
 
 --------- Conversion methods ------------------
 -- Used to be a problem in #12068. Now we can write the rules, but do they fire?
-{-# SPECIALIZE toPow :: (Fact m, UCRTElt CT r) => UCyc CT m rep r -> UCyc CT m P r #-}
-{-# SPECIALIZE toPow :: (Fact m, UCRTElt RT r) => UCyc RT m rep r -> UCyc RT m P r #-}
+{-# SPECIALIZE INLINE toPow :: (Fact m, UCRTElt CT r) => UCyc CT m rep r -> UCyc CT m P r #-}
+{-# SPECIALIZE INLINE toPow :: (Fact m, UCRTElt RT r) => UCyc RT m rep r -> UCyc RT m P r #-}
 -- | Convert to powerful-basis representation.
 toPow :: (Fact m, UCRTElt t r) => UCyc t m rep r -> UCyc t m P r
 {-# INLINABLE toPow #-}

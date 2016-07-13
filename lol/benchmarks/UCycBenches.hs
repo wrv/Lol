@@ -5,24 +5,31 @@
 
 module UCycBenches (ucycBenches) where
 
-import Apply.Cyc
-import Benchmarks
-import Utils
-
 import Crypto.Lol
 import Crypto.Lol.Cyclotomic.UCyc
-import Crypto.Lol.Types
+import Crypto.Lol.Cyclotomic.Tensor.CTensor
+
+import Control.Monad.Random
+import GHC.Magic
+import Criterion
 
 ucycBenches :: IO Benchmark
-ucycBenches = benchGroup "UCyc" [
-  benchGroup "l"     $ applyBasic (Proxy::Proxy QuickParams) $ hideArgs bench_l,
-  benchGroup "twace" $ applyTwoIdx twoIdxParams $ hideArgs bench_twacePow,
-  benchGroup "embed" $ applyTwoIdx twoIdxParams $ hideArgs bench_embedPow
+ucycBenches = do
+  x :: UCyc CT F128 D Int64 <- getRandom
+  return $ bench "UCyc.toPow" $ nf toPow x
+
+
+
+{-
+  benchGroup "UCyc" [
+  benchGroup "l"     $ applyBasic (Proxy::Proxy QuickParams) $ hideArgs bench_l
+  --benchGroup "twace" $ applyTwoIdx twoIdxParams $ hideArgs bench_twacePow,
+  --benchGroup "embed" $ applyTwoIdx twoIdxParams $ hideArgs bench_embedPow
   ]
 
 -- convert input from Dec basis to Pow basis
 bench_l :: (BasicCtx t m r) => UCyc t m D r -> Bench '(t,m,r)
-bench_l = bench toPow
+bench_l = bench toPow --  (inline toPow)
 
 bench_twacePow :: forall t m m' r . (TwoIdxCtx t m m' r)
   => UCyc t m' P r -> Bench '(t,m,m',r)
@@ -46,3 +53,4 @@ type MM'RCombos =
 type TwoIdxParams = ( '(,) <$> Tensors) <*> MM'RCombos
 twoIdxParams :: Proxy TwoIdxParams
 twoIdxParams = Proxy
+-}

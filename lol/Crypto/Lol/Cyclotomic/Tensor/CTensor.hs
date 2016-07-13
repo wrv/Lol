@@ -22,7 +22,7 @@
 -- | Wrapper for a C++ implementation of the 'Tensor' interface.
 
 module Crypto.Lol.Cyclotomic.Tensor.CTensor
-( CT ) where
+( CT, wrap, basicDispatch, dl, l') where
 
 import Algebra.Additive     as Additive (C)
 import Algebra.Module       as Module (C)
@@ -76,6 +76,8 @@ import Data.Foldable as F
 import Data.Sequence as S (fromList)
 
 import System.IO.Unsafe (unsafePerformIO)
+
+import GHC.Magic
 
 -- | Newtype wrapper around a Vector.
 newtype CT' (m :: Factored) r = CT' { unCT :: Vector r }
@@ -158,6 +160,7 @@ toZV v@(ZV _) = v
 zvToCT' :: forall m r . (Storable r) => IZipVector m r -> CT' m r
 zvToCT' v = coerce (convert $ unIZipVector v :: Vector r)
 
+{-# INLINE wrap #-}
 wrap :: (Storable r) => (CT' l r -> CT' m r) -> (CT l r -> CT m r)
 wrap f (CT v) = CT $ f v
 wrap f (ZV v) = CT $ f $ zvToCT' v
@@ -247,7 +250,8 @@ instance Tensor CT where
 
   scalarPow = CT . scalarPow' -- Vector code
 
-  l = wrap $ untag $ basicDispatch dl
+  l :: forall m r . (Additive r, Fact m, Storable r, Dispatch r) => CT m r -> CT m r
+  l = wrap l' -- wrap $ (coerce $ (basicDispatch dl :: Tagged m (CT' m r -> CT' m r)) :: CT' m r -> CT' m r) -- wrap l' --
   lInv = wrap $ untag $ basicDispatch dlinv
 
   mulGPow = wrap mulGPow'
@@ -303,7 +307,7 @@ instance Tensor CT where
   {-# INLINABLE entailRandomT #-}
   {-# INLINABLE entailShowT #-}
   {-# INLINABLE scalarPow #-}
-  {-# INLINABLE l #-}
+  {-# INLINE l #-}
   {-# INLINABLE lInv #-}
   {-# INLINABLE mulGPow #-}
   {-# INLINABLE mulGDec #-}
@@ -324,6 +328,18 @@ instance Tensor CT where
   {-# INLINABLE zipWithT #-}
   {-# INLINABLE unzipT #-}
 
+{-# INLINE l' #-}
+l' :: forall m r . (Fact m, Storable r, Dispatch r) => CT' m r -> CT' m r
+l' =
+  let factors = proxy (marshalFactors <$> ppsFact) (Proxy::Proxy m)
+      totm = proxy (fromIntegral <$> totientFact) (Proxy::Proxy m)
+      numFacts = fromIntegral $ SV.length factors
+  in \(CT' y) -> unsafePerformIO $ do
+        yout <- SV.thaw y
+        SM.unsafeWith yout (\pout ->
+          SV.unsafeWith factors (\pfac ->
+            dl pout totm pfac numFacts))
+        CT' <$> unsafeFreeze yout
 
 coerceTw :: (Functor mon) => TaggedT '(m, m') mon (Vector r -> Vector r) -> mon (CT' m' r -> CT' m r)
 coerceTw = (coerce <$>) . untagT
@@ -362,6 +378,7 @@ withBasicArgs f =
         f pout totm pfac numFacts))
     CT' <$> unsafeFreeze yout
 
+{-# INLINE basicDispatch #-}
 basicDispatch :: (Storable r, Fact m)
                  => (Ptr r -> Int64 -> Ptr CPP -> Int16 -> IO ())
                      -> Tagged m (CT' m r -> CT' m r)

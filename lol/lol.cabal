@@ -88,21 +88,13 @@ library
 
   exposed-modules:
     Crypto.Lol
-    Crypto.Lol.Types
     Crypto.Lol.Factored
     Crypto.Lol.Reflects
     Crypto.Lol.CRTrans
     Crypto.Lol.Gadget
     Crypto.Lol.Prelude
 
-    Crypto.Lol.Cyclotomic.Cyc
     Crypto.Lol.Cyclotomic.UCyc
-    Crypto.Lol.Cyclotomic.RescaleCyc
-    Crypto.Lol.Cyclotomic.Linear
-
-    Crypto.Lol.RLWE.Continuous
-    Crypto.Lol.RLWE.Discrete
-    Crypto.Lol.RLWE.RLWR
 
     Crypto.Lol.Cyclotomic.Tensor
     Crypto.Lol.Cyclotomic.Tensor.CTensor
@@ -119,9 +111,6 @@ library
     Crypto.Proto.RLWE
     Crypto.Proto.RLWE.Rq
     Crypto.Proto.RLWE.Kq
-    Crypto.Proto.RLWE.SampleCont
-    Crypto.Proto.RLWE.SampleDisc
-    Crypto.Proto.RLWE.SampleRLWR
 
   other-modules:
 
@@ -152,6 +141,7 @@ library
     crypto-api,
     data-default >= 0.3.0 && < 0.8,
     deepseq >= 1.4.1.1 && <1.5,
+    ghc-prim,
     monadcryptorandom,
     MonadRandom >= 0.2 && < 0.5,
     mtl >= 2.2.1 && < 2.3,
@@ -217,6 +207,7 @@ Benchmark bench-lol
     criterion,
     deepseq,
     DRBG,
+    ghc-prim,
     lol,
     MonadRandom,
     mtl,

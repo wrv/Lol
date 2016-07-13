@@ -257,6 +257,7 @@ instance (ZqTuple r, Storable (ModPairs r), CTypeOf r ~ ZqB64D)
     in with qs $ \qsptr ->
         mulRq numPairs (castPtr aout) (castPtr bout) totm (castPtr qsptr)
   dgaussdec = error "cannot call CT gaussianDec on type ZqBasic"
+  {-# INLINE dl #-}
 
 -- products of Complex correspond to CRTExt of a Zq product
 instance (Tuple r, CTypeOf r ~ ComplexD) => Dispatch' ComplexD r where
