@@ -3,7 +3,7 @@
 {-# LANGUAGE KindSignatures             #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 
-module FooBar where
+module Foo where
 
 import Control.DeepSeq
 import Control.Monad.ST
@@ -15,14 +15,12 @@ import Data.Vector.Storable as SV (Vector, generate, thaw, unsafeFreeze)
 import Data.Vector.Storable.Mutable as SM
 
 import Factored
-
-newtype Bar (m :: Factored) = Bar (Foo m) deriving (NFData)
-
-bar :: (Fact m) => Bar m -> Bar m
-{-# INLINABLE bar #-}
-bar (Bar v) = Bar $ foo v
+import T
 
 newtype Foo (m :: Factored) = Foo (Vector Int64) deriving (NFData)
+
+instance T Foo where
+  f = foo
 
 {-# INLINABLE foo #-}
 foo :: forall m . (Fact m) => Foo m -> Foo m
