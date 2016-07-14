@@ -548,7 +548,7 @@ toPow (CRTE _ v) = Pow $ fmapT fromExt $ runIdentity crtInv v
 -}
 toPow = \x -> case x of
   x@(Pow _) -> x
-  (Dec v) -> Pow $ l v
+  (Dec v) -> Pow $ (inline l) v
   (CRTC s v) -> Pow $ crtInvCS s v
   (CRTE _ v) -> Pow $ fmapT fromExt $ runIdentity crtInv v
 
