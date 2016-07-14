@@ -539,10 +539,16 @@ crtSet =
 -- | Convert to powerful-basis representation.
 toPow :: (Fact m, UCRTElt t r) => UCyc t m rep r -> UCyc t m P r
 {-# INLINABLE toPow #-}
-toPow x@(Pow _) = x
+{-toPow x@(Pow _) = x
 toPow (Dec v) = Pow $ l v
 toPow (CRTC s v) = Pow $ crtInvCS s v
 toPow (CRTE _ v) = Pow $ fmapT fromExt $ runIdentity crtInv v
+-}
+toPow x = case x of
+  x@(Pow _) -> x
+  (Dec v) -> Pow $ l v
+  (CRTC s v) -> Pow $ crtInvCS s v
+  (CRTE _ v) -> Pow $ fmapT fromExt $ runIdentity crtInv v
 
 -- | Convenient version of 'toPow' for 'Either' CRT basis type.
 toPowCE :: (Fact m, UCRTElt t r) => UCycEC t m r -> UCyc t m P r
