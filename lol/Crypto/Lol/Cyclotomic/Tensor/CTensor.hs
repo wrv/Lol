@@ -198,7 +198,7 @@ instance Tensor CT where
   scalarPow = CT . scalarPow' -- Vector code
 
   l :: forall m r . (Fact m, Storable r, Dispatch r) => CT m r -> CT m r
-  l = wrap l' -- $ withBasicArgs2 (inline dl) -- wrap l' --
+  l = wrap $ withBasicArgs2 dl
   lInv = wrap $ basicDispatch dlinv
 
   mulGPow = wrap mulGPow'
@@ -254,7 +254,7 @@ instance Tensor CT where
   {-# INLINABLE entailRandomT #-}
   {-# INLINABLE entailShowT #-}
   {-# INLINABLE scalarPow #-}
-  {-# INLINE l #-}
+  {-# INLINABLE l #-}
   {-# INLINABLE lInv #-}
   {-# INLINABLE mulGPow #-}
   {-# INLINABLE mulGDec #-}
@@ -275,7 +275,7 @@ instance Tensor CT where
   {-# INLINABLE zipWithT #-}
   {-# INLINABLE unzipT #-}
 
-{-# INLINE l' #-}
+{-# INLINABLE l' #-}
 l' :: forall m r . (Fact m, Storable r, Dispatch r) => CT' m r -> CT' m r
 l' =
   let factors = proxy (marshalFactors <$> ppsFact) (Proxy::Proxy m)
@@ -311,6 +311,7 @@ divGPow' :: (TElt CT r, Fact m, IntegralDomain r, ZeroTestable r)
             => CT' m r -> Maybe (CT' m r)
 divGPow' = checkDiv $ basicDispatch dginvpow
 
+-- EAC: 2x faster than basicDispatch
 {-# INLINABLE withBasicArgs2 #-}
 withBasicArgs2 :: forall m r . (Fact m, Storable r)
   => (Ptr r -> Int64 -> Ptr CPP -> Int16 -> IO ())

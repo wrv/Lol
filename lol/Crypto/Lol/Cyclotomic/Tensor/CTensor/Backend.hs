@@ -234,7 +234,7 @@ instance (ZqTuple r, Storable (ModPairs r), CTypeOf r ~ ZqB64D)
     in with qs $ \qsptr ->
         mulRq numPairs (castPtr aout) (castPtr bout) totm (castPtr qsptr)
   dgaussdec = error "cannot call CT gaussianDec on type ZqBasic"
-  {-# INLINE dl #-}
+  --{-# INLINE dl #-}
 
 -- products of Complex correspond to CRTExt of a Zq product
 instance (Tuple r, CTypeOf r ~ ComplexD) => Dispatch' ComplexD r where
@@ -296,6 +296,7 @@ instance Dispatch' Int64D Int64 where
   dmul = error "cannot call CT (*) on type Int64"
   dgaussdec = error "cannot call CT gaussianDec on type Int64"
   --{-# INLINABLE dl #-}
+  -- EAC: do NOT mark INLINABLE/INLINE!
 
 foreign import ccall unsafe "tensorLR" tensorLR ::                  Int16 -> Ptr Int64 -> Int64 -> Ptr CPP -> Int16          -> IO ()
 foreign import ccall unsafe "tensorLInvR" tensorLInvR ::            Int16 -> Ptr Int64 -> Int64 -> Ptr CPP -> Int16          -> IO ()

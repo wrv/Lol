@@ -541,11 +541,6 @@ toPow :: (Fact m, Tensor t, CRTEmbed r,
                     CRTrans Maybe r, TElt t r,
                     CRTrans Identity (CRTExt r), TElt t (CRTExt r)) => UCyc t m rep r -> UCyc t m P r
 {-# INLINABLE toPow #-}
-{-toPow x@(Pow _) = x
-toPow (Dec v) = Pow $ l v
-toPow (CRTC s v) = Pow $ crtInvCS s v
-toPow (CRTE _ v) = Pow $ fmapT fromExt $ runIdentity crtInv v
--}
 toPow = \x -> case x of
   x@(Pow _) -> x
   (Dec v) -> Pow $ (inline l) v
