@@ -280,7 +280,7 @@ instance Dispatch' DoubleD Double where
 instance Dispatch' Int64D Int64 where
   dcrt = error "cannot call CT Crt on type Int64"
   dcrtinv = error "cannot call CT CrtInv on type Int64"
-  dl = \pout -> tensorLR 1 (castPtr pout)
+  dl = tensorLR 1 . castPtr
   dlinv pout =
     tensorLInvR 1 (castPtr pout)
   dnorm pout =
@@ -295,6 +295,7 @@ instance Dispatch' Int64D Int64 where
     tensorGInvDecR 1 (castPtr pout)
   dmul = error "cannot call CT (*) on type Int64"
   dgaussdec = error "cannot call CT gaussianDec on type Int64"
+  --{-# INLINABLE dl #-}
 
 foreign import ccall unsafe "tensorLR" tensorLR ::                  Int16 -> Ptr Int64 -> Int64 -> Ptr CPP -> Int16          -> IO ()
 foreign import ccall unsafe "tensorLInvR" tensorLInvR ::            Int16 -> Ptr Int64 -> Int64 -> Ptr CPP -> Int16          -> IO ()
