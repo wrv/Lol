@@ -535,6 +535,7 @@ crtSet =
 --------- Conversion methods ------------------
 -- Used to be a problem in #12068. Now we can write the rules, but do they fire?
 {-# SPECIALIZE INLINE toPow :: (Fact m, UCRTElt CT r) => UCyc CT m rep r -> UCyc CT m P r #-}
+{-# SPECIALIZE INLINE toPow :: (Fact m) => UCyc CT m rep Int64 -> UCyc CT m P Int64 #-}
 -- | Convert to powerful-basis representation.
 toPow :: (Fact m, UCRTElt t r) => UCyc t m rep r -> UCyc t m P r
 {-# INLINABLE toPow #-}

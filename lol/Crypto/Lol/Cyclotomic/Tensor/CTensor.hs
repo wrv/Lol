@@ -198,7 +198,7 @@ instance Tensor CT where
   scalarPow = CT . scalarPow' -- Vector code
 
   l :: forall m r . (Fact m, Storable r, Dispatch r) => CT m r -> CT m r
-  l = wrap l' -- $ basicDispatch dl -- wrap l' --
+  l = wrap l' -- $ withBasicArgs2 (inline dl) -- wrap l' --
   lInv = wrap $ basicDispatch dlinv
 
   mulGPow = wrap mulGPow'
@@ -310,6 +310,21 @@ mulGPow' = basicDispatch dmulgpow
 divGPow' :: (TElt CT r, Fact m, IntegralDomain r, ZeroTestable r)
             => CT' m r -> Maybe (CT' m r)
 divGPow' = checkDiv $ basicDispatch dginvpow
+
+{-# INLINABLE withBasicArgs2 #-}
+withBasicArgs2 :: forall m r . (Fact m, Storable r)
+  => (Ptr r -> Int64 -> Ptr CPP -> Int16 -> IO ())
+     -> CT' m r -> CT' m r
+withBasicArgs2 f =
+  let factors = proxy (marshalFactors <$> ppsFact) (Proxy::Proxy m)
+      totm = proxy (fromIntegral <$> totientFact) (Proxy::Proxy m)
+      numFacts = fromIntegral $ SV.length factors
+  in \(CT' x) -> unsafePerformIO $ do
+    yout <- SV.thaw x
+    SM.unsafeWith yout (\pout ->
+      SV.unsafeWith factors (\pfac ->
+        f pout totm pfac numFacts))
+    CT' <$> unsafeFreeze yout
 
 withBasicArgs :: forall m r . (Fact m, Storable r)
   => (Ptr r -> Int64 -> Ptr CPP -> Int16 -> IO ())
