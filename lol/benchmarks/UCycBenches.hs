@@ -16,7 +16,7 @@ import Criterion
 ucycBenches :: IO Benchmark
 ucycBenches = do
   x :: UCyc CT F128 D Int64 <- getRandom
-  return $ bench "UCyc.toPow" $ nf toPow x
+  return $ bench "UCyc.toPow" $ nf (inline toPow) x
 
 
 
