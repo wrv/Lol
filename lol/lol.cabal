@@ -87,7 +87,6 @@ library
     ghc-options: -O3 -Odph -funbox-strict-fields -fno-liberate-case -funfolding-use-threshold1000 -funfolding-keeness-factor1000
 
   exposed-modules:
-    Crypto.Lol
     Crypto.Lol.Factored
     Crypto.Lol.Reflects
     Crypto.Lol.CRTrans
@@ -98,19 +97,10 @@ library
 
     Crypto.Lol.Cyclotomic.Tensor
     Crypto.Lol.Cyclotomic.Tensor.CTensor
-    Crypto.Lol.Cyclotomic.Tensor.RepaTensor
 
-    Crypto.Lol.Types.Random
     Crypto.Lol.Types.FiniteField
-    Crypto.Lol.Types.IrreducibleChar2
-    Crypto.Lol.Types.Proto
-    Crypto.Lol.Types.RRq
     Crypto.Lol.Types.ZPP
     Crypto.Lol.Types.ZqBasic
-
-    Crypto.Proto.RLWE
-    Crypto.Proto.RLWE.Rq
-    Crypto.Proto.RLWE.Kq
 
   other-modules:
 
@@ -123,11 +113,6 @@ library
     Crypto.Lol.Types.Numeric
     Crypto.Lol.Types.IZipVector
     Crypto.Lol.Cyclotomic.CRTSentinel
-    Crypto.Lol.Cyclotomic.Tensor.RepaTensor.CRT
-    Crypto.Lol.Cyclotomic.Tensor.RepaTensor.Extension
-    Crypto.Lol.Cyclotomic.Tensor.RepaTensor.Dec
-    Crypto.Lol.Cyclotomic.Tensor.RepaTensor.GL
-    Crypto.Lol.Cyclotomic.Tensor.RepaTensor.RTCommon
     Crypto.Lol.Cyclotomic.Tensor.CTensor.Extension
     Crypto.Lol.Cyclotomic.Tensor.CTensor.Backend
 

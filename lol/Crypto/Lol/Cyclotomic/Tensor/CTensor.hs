@@ -62,18 +62,11 @@ import Crypto.Lol.GaussRandom
 import Crypto.Lol.Prelude                             as LP hiding
                                                              (replicate,
                                                              unzip, zip)
-import Crypto.Lol.Reflects
 import Crypto.Lol.Types.FiniteField
 import Crypto.Lol.Types.IZipVector
-import Crypto.Lol.Types.Proto
-import Crypto.Lol.Types.RRq
-import Crypto.Lol.Types.ZqBasic
 
-import Crypto.Proto.RLWE.Kq
-import Crypto.Proto.RLWE.Rq
 
 import Data.Foldable as F
-import Data.Sequence as S (fromList)
 
 import System.IO.Unsafe (unsafePerformIO)
 
@@ -101,52 +94,6 @@ instance Eq r => Eq (CT m r) where
   (CT x) == (CT y) = x == y
   x@(CT _) == y = x == toCT y
   y == x@(CT _) = x == toCT y
-
-instance (Fact m, Reflects q Int64) => Protoable (CT m (ZqBasic q Int64)) where
-  type ProtoType (CT m (ZqBasic q Int64)) = Rq
-
-  toProto (CT (CT' xs)) =
-    let m = fromIntegral $ proxy valueFact (Proxy::Proxy m)
-        q = proxy value (Proxy::Proxy q) :: Int64
-    in Rq m (fromIntegral q) $ S.fromList $ SV.toList $ SV.map LP.lift xs
-  toProto x@(ZV _) = toProto $ toCT x
-
-  fromProto (Rq m' q' xs) =
-    let m = proxy valueFact (Proxy::Proxy m) :: Int
-        q = proxy value (Proxy::Proxy q) :: Int64
-        n = proxy totientFact (Proxy::Proxy m)
-        xs' = SV.fromList $ F.toList xs
-        len = F.length xs
-    in if m == fromIntegral m' && len == n && fromIntegral q == q'
-       then return $ CT $ CT' $ SV.map reduce xs'
-       else throwError $
-            "An error occurred while reading the proto type for CT.\n\
-            \Expected m=" ++ show m ++ ", got " ++ show m' ++ "\n\
-            \Expected n=" ++ show n ++ ", got " ++ show len ++ "\n\
-            \Expected q=" ++ show q ++ ", got " ++ show q' ++ "."
-
-instance (Fact m, Reflects q Double) => Protoable (CT m (RRq q Double)) where
-  type ProtoType (CT m (RRq q Double)) = Kq
-
-  toProto (CT (CT' xs)) =
-    let m = fromIntegral $ proxy valueFact (Proxy::Proxy m)
-        q = proxy value (Proxy::Proxy q) :: Double
-    in Kq m q $ S.fromList $ SV.toList $ SV.map LP.lift xs
-  toProto x@(ZV _) = toProto $ toCT x
-
-  fromProto (Kq m' q' xs) =
-    let m = proxy valueFact (Proxy::Proxy m) :: Int
-        q = proxy value (Proxy::Proxy q) :: Double
-        n = proxy totientFact (Proxy::Proxy m)
-        xs' = SV.fromList $ F.toList xs
-        len = F.length xs
-    in if m == fromIntegral m' && len == n && q == q'
-       then return $ CT $ CT' $ SV.map reduce xs'
-       else throwError $
-            "An error occurred while reading the proto type for CT.\n\
-            \Expected m=" ++ show m ++ ", got " ++ show m' ++ "\n\
-            \Expected n=" ++ show n ++ ", got " ++ show len ++ "\n\
-            \Expected q=" ++ show (round q :: Int64) ++ ", got " ++ show q' ++ "."
 
 toCT :: (Storable r) => CT m r -> CT m r
 toCT v@(CT _) = v
@@ -250,7 +197,7 @@ instance Tensor CT where
 
   scalarPow = CT . scalarPow' -- Vector code
 
-  l :: forall m r . (Additive r, Fact m, Storable r, Dispatch r) => CT m r -> CT m r
+  l :: forall m r . (Fact m, Storable r, Dispatch r) => CT m r -> CT m r
   l = wrap l' -- $ basicDispatch dl -- wrap l' --
   lInv = wrap $ basicDispatch dlinv
 

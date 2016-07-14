@@ -56,7 +56,6 @@ import           Crypto.Lol.CRTrans
 import           Crypto.Lol.Cyclotomic.CRTSentinel
 import qualified Crypto.Lol.Cyclotomic.Tensor      as T
 import           Crypto.Lol.Cyclotomic.Tensor.CTensor (CT)
-import           Crypto.Lol.Cyclotomic.Tensor.RepaTensor (RT)
 import           Crypto.Lol.Prelude                as LP
 import           Crypto.Lol.Types.FiniteField
 import           Crypto.Lol.Types.ZPP
@@ -75,8 +74,6 @@ import Data.Foldable          as F
 import Data.Maybe
 import Data.Traversable
 import Test.QuickCheck
-
-import Crypto.Lol.Types.Proto
 
 import GHC.Magic
 
@@ -538,7 +535,6 @@ crtSet =
 --------- Conversion methods ------------------
 -- Used to be a problem in #12068. Now we can write the rules, but do they fire?
 {-# SPECIALIZE INLINE toPow :: (Fact m, UCRTElt CT r) => UCyc CT m rep r -> UCyc CT m P r #-}
-{-# SPECIALIZE INLINE toPow :: (Fact m, UCRTElt RT r) => UCyc RT m rep r -> UCyc RT m P r #-}
 -- | Convert to powerful-basis representation.
 toPow :: (Fact m, UCRTElt t r) => UCyc t m rep r -> UCyc t m P r
 {-# INLINABLE toPow #-}
@@ -682,8 +678,3 @@ instance (Tensor t, Fact m, NFElt r, TElt t r, TElt t (CRTExt r))
   rnf (Dec x)      = rnf x \\ witness entailNFDataT x
   rnf (CRTC _ x)   = rnf x \\ witness entailNFDataT x
   rnf (CRTE _ x)   = rnf x \\ witness entailNFDataT x
-
-instance (Protoable (t m r)) => Protoable (UCyc t m D r) where
-  type ProtoType (UCyc t m D r) = ProtoType (t m r)
-  toProto (Dec t) = toProto t
-  fromProto t = Dec <$> fromProto t

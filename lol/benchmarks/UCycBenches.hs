@@ -5,7 +5,7 @@
 
 module UCycBenches (ucycBenches) where
 
-import Crypto.Lol
+import Crypto.Lol.Prelude
 import Crypto.Lol.Cyclotomic.UCyc
 import Crypto.Lol.Cyclotomic.Tensor.CTensor
 
