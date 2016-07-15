@@ -6,13 +6,15 @@
 
 module CTBenches (ctBenches) where
 
-import Crypto.Lol
+import Crypto.Lol.Prelude
 import Crypto.Lol.Cyclotomic.Tensor.CTensor
 import Criterion
-import Utils
+import Crypto.Lol.Types.ZqBasic
+--import Utils
 import Control.Monad.Random
 
 ctBenches :: IO Benchmark
 ctBenches = do
-  x :: CT F128 (Zq 257) <- getRandom
-  return $ bench "CT.l" $ nf l' x
+  x :: CT F2048 (ZqBasic 12289 Int64) <- getRandom
+  return $ bgroup "CT" [bench "l" $ nf (wrap l') x,
+                        bench "crt" $ nf (wrap $ fromJust' "" crt') x]

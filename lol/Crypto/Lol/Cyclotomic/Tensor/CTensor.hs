@@ -22,7 +22,7 @@
 -- | Wrapper for a C++ implementation of the 'Tensor' interface.
 
 module Crypto.Lol.Cyclotomic.Tensor.CTensor
-( CT, wrap, basicDispatch, dl, l') where
+( CT, wrap, basicDispatch, dl, l', crt') where
 
 import Algebra.Additive     as Additive (C)
 import Algebra.Module       as Module (C)
@@ -197,7 +197,6 @@ instance Tensor CT where
 
   scalarPow = CT . scalarPow' -- Vector code
 
-  l :: forall m r . (Fact m, Storable r, Dispatch r) => CT m r -> CT m r
   l = wrap $ withBasicArgs2 dl
   lInv = wrap $ basicDispatch dlinv
 
@@ -339,6 +338,22 @@ withBasicArgs f =
     SM.unsafeWith yout (\pout ->
       SV.unsafeWith factors (\pfac ->
         f pout totm pfac numFacts))
+    CT' <$> unsafeFreeze yout
+
+{-# INLINABLE crt' #-}
+crt' :: forall m mon r . (Storable r, CRTrans mon r, Dispatch r, Fact m)
+         => mon (CT' m r -> CT' m r)
+crt' = do
+  ru' <- proxyT ru (Proxy::Proxy m)
+  let factors = proxy (marshalFactors <$> ppsFact) (Proxy::Proxy m)
+      totm = proxy (fromIntegral <$> totientFact) (Proxy::Proxy m)
+      numFacts = fromIntegral $ SV.length factors
+  return $ \(CT' x) -> unsafePerformIO $ do
+    yout <- SV.thaw x
+    withPtrArray ru' (\ruptr ->
+      SM.unsafeWith yout (\pout ->
+        SV.unsafeWith factors (\pfac ->
+          dcrt ruptr pout totm pfac numFacts)))
     CT' <$> unsafeFreeze yout
 
 {-# INLINE basicDispatch #-}

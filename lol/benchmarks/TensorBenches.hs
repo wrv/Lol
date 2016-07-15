@@ -8,13 +8,16 @@ module TensorBenches (tensorBenches) where
 import Crypto.Lol.Prelude
 import Crypto.Lol.Cyclotomic.Tensor
 import Crypto.Lol.Cyclotomic.Tensor.CTensor
+import Crypto.Lol.Types.ZqBasic
 import Criterion
 import Control.Monad.Random
+import GHC.Magic
 
 tensorBenches :: IO Benchmark
 tensorBenches = do
-  x :: CT F128 Int64 <- getRandom
-  return $ bench "Tensor.l" $ nf l x
+  x :: CT F2048 (ZqBasic 12289 Int64) <- getRandom
+  return $ bgroup "Tensor" [bench "l" $ nf l x,
+                            bench "crt" $ nf (fromJust' "" crt) x]
 
 {-
   benchGroup "Tensor" [

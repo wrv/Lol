@@ -8,6 +8,7 @@ module UCycBenches (ucycBenches) where
 import Crypto.Lol.Prelude
 import Crypto.Lol.Cyclotomic.UCyc
 import Crypto.Lol.Cyclotomic.Tensor.CTensor
+import Crypto.Lol.Types.ZqBasic
 
 import Control.Monad.Random
 import GHC.Magic
@@ -15,9 +16,10 @@ import Criterion
 
 ucycBenches :: IO Benchmark
 ucycBenches = do
-  x :: UCyc CT F128 D Int64 <- getRandom
-  return $ bench "UCyc.toPow" $ nf (inline toPow) x
-
+  x :: UCyc CT F2048 D (ZqBasic 12289 Int64) <- getRandom
+  y :: UCyc CT F2048 P (ZqBasic 12289 Int64) <- getRandom
+  return $ bgroup "UCyc" [bench "toPow" $ nf toPow x,
+                          bench "toCRT" $ nf toCRT y]
 
 
 {-
