@@ -46,7 +46,7 @@ module Crypto.Lol.Cyclotomic.Cyc
 -- * Core cyclotomic operations
 , mulG, divG, gSqNorm, liftCyc, liftPow, liftDec
 -- * Representation advice
-, advisePow, adviseDec, adviseCRT
+, advisePow, adviseDec, adviseCRT, toCRT', toPow'
 -- * Error sampling
 , tGaussian, errorRounded, errorCoset
 -- * Sub/extension rings
@@ -581,17 +581,18 @@ toDec' (Scalar c) = Dec $ toDec $ scalarPow c
 toDec' (Sub c) = toDec' $ embed' c
 
 -- | Force to a CRT representation (for internal use only).
-toCRT' (Pow u) = CRT $ toCRT u
-toCRT' (Dec u) = CRT $ toCRT u
-toCRT' c@(CRT _) = c
-toCRT' (Scalar c) = CRT $ scalarCRT c
+toCRT' x = case x of
+  (Pow u) -> CRT $ toCRT u
+  (Dec u) -> CRT $ toCRT u
+  c@(CRT _) -> c
+  (Scalar c) -> CRT $ scalarCRT c
 -- CJP: the following is the fastest algorithm for when both source
 -- and target have the same CRTr/CRTe choice.  It is not the fastest
 -- when the choices are different (it will do an unnecessary CRT if
 -- input is non-CRT), but this is an unusual case.  Note: both calls
 -- to toCRT' are necessary in general, because embed' may not preserve
 -- CRT representation!
-toCRT' (Sub c) = toCRT' $ embed' $ toCRT' c
+  (Sub c) -> toCRT' $ embed' $ toCRT' c
 
 ---------- Utility instances ----------
 

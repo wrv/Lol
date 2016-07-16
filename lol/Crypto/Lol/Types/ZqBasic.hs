@@ -21,7 +21,7 @@ import Crypto.Lol.CRTrans
 import Crypto.Lol.Gadget
 import Crypto.Lol.Prelude           as LP
 import Crypto.Lol.Reflects
-import Crypto.Lol.Types.FiniteField
+import Crypto.Lol.Types.FiniteField hiding (trace)
 import Crypto.Lol.Types.ZPP
 
 import Math.NumberTheory.Primes.Factorisation
@@ -52,6 +52,8 @@ import qualified Algebra.Field          as Field (C)
 import qualified Algebra.IntegralDomain as IntegralDomain (C)
 import qualified Algebra.Ring           as Ring (C)
 import qualified Algebra.ZeroTestable   as ZeroTestable (C)
+
+import Debug.Trace
 
 -- | The ring \(\Z_q\) of integers modulo 'q', using underlying integer
 -- type 'z'.
@@ -122,6 +124,7 @@ instance (Reflects p z, Reflects q z, ToInteger z, Field (ZqBasic q z), Field (Z
 -- generator of \(\Z_q^*\) and raising it to the \( (q-1)/m\) power.
 -- Therefore, outputs for different values of \(m\) are consistent,
 -- i.e., \(\omega_{m'}^(m'/m) = \omega_m\).
+{-# NOINLINE principalRootUnity #-}
 principalRootUnity ::
     forall m q z . (Reflects m Int, Reflects q z, ToInteger z, Enumerable (ZqBasic q z))
                => TaggedT m Maybe (Int -> ZqBasic q z)
@@ -135,13 +138,13 @@ principalRootUnity =        -- use Integers for all intermediate calcs
       -- the powers we need to check
       exps = div order <$> pfactors
       -- whether an element is a generator of Zq^*
-      isGen x = (x^order == one) && all (\e -> x^e /= one) exps
+      isGen x = (x^order == one) && all (\e -> x^e /= one) exps -- trace "entered zqpru" $
   in tagT $ if isPrime qval -- for simplicity, require q to be prime
             then let (mq,mr) = order `divMod` fromIntegral mval
                  in if mr == 0
                     then let omega = head (filter isGen values) ^ mq
                              omegaPows = V.iterateN mval (*omega) one
-                         in Just $ (omegaPows V.!) . (`mod` mval)
+                         in Just $ (omegaPows V.!) . (`mod` mval) --  trace "inside zqjust" $
                     else Nothing
             else Nothing       -- fail if q composite
 

@@ -5,11 +5,41 @@
 
 module CycBenches (cycBenches) where
 
+
+import Crypto.Lol
+import Crypto.Lol.Cyclotomic.UCyc
+import Crypto.Lol.Cyclotomic.Tensor.CTensor
+import Crypto.Lol.Types.ZqBasic
+
+import Control.Monad.Random
+import GHC.Magic
+import Criterion
+import Control.DeepSeq
+
+cycBenches :: IO Benchmark
+cycBenches = do
+  y :: Cyc CT (F9*F5*F7*F11) (ZqBasic 34651 Int64) <- getRandom
+  let y' = advisePow y
+  return $ bgroup "UCyc" [--bench "toPow" $ nf toPow x,
+                          bench "adviseCRT" $ nf toCRT' y']
+
+
+{-
+cycBenches :: IO ()
+cycBenches = do
+  y :: Cyc CT (F9*F5*F7*F11) (ZqBasic 34651 Int64) <- getRandom
+  let x = force $ (iterate (adviseCRT . advisePow) y) !! 10
+  x `deepseq` print "Done"
+-}
+
+{-
 import Apply.Cyc
 import Benchmarks
 import Utils
 
 import Control.Monad.Random
+
+import GHC.Magic
 
 import Crypto.Lol
 import Crypto.Lol.Types
@@ -21,18 +51,19 @@ import Data.Singletons.TypeRepStar ()
 
 cycBenches :: IO Benchmark
 cycBenches = benchGroup "Cyc" [
-  benchGroup "unzipCycPow" $ applyUnzip  allParams    $ hideArgs bench_unzipCycPow,
-  benchGroup "unzipCycCRT" $ applyUnzip  allParams    $ hideArgs bench_unzipCycCRT,
-  benchGroup "*"           $ applyBasic  allParams    $ hideArgs bench_mul,
-  benchGroup "crt"         $ applyBasic  allParams    $ hideArgs bench_crt,
-  benchGroup "crtInv"      $ applyBasic  allParams    $ hideArgs bench_crtInv,
-  benchGroup "l"           $ applyBasic  allParams    $ hideArgs bench_l,
-  benchGroup "*g Pow"      $ applyBasic  allParams    $ hideArgs bench_mulgPow,
-  benchGroup "*g CRT"      $ applyBasic  allParams    $ hideArgs bench_mulgCRT,
-  benchGroup "lift"        $ applyLift   liftParams   $ hideArgs bench_liftPow,
-  benchGroup "error"       $ applyError  errorParams  $ hideArgs $ bench_errRounded 0.1,
-  benchGroup "twace"       $ applyTwoIdx twoIdxParams $ hideArgs bench_twacePow,
-  benchGroup "embed"       $ applyTwoIdx twoIdxParams $ hideArgs bench_embedPow
+  --benchGroup "unzipCycPow" $ applyUnzip  allParams    $ hideArgs bench_unzipCycPow,
+  --benchGroup "unzipCycCRT" $ applyUnzip  allParams    $ hideArgs bench_unzipCycCRT,
+  --benchGroup "*"           $ applyBasic  allParams    $ hideArgs bench_mul,
+  --benchGroup "l"           $ applyBasic  allParams    $ hideArgs bench_l,
+  benchGroup "crt"         $ applyBasic  allParams    $ hideArgs bench_crt
+  --benchGroup "crtInv"      $ applyBasic  allParams    $ hideArgs bench_crtInv,
+
+  --benchGroup "*g Pow"      $ applyBasic  allParams    $ hideArgs bench_mulgPow,
+ -- benchGroup "*g CRT"      $ applyBasic  allParams    $ hideArgs bench_mulgCRT,
+  --benchGroup "lift"        $ applyLift   liftParams   $ hideArgs bench_liftPow,
+ -- benchGroup "error"       $ applyError  errorParams  $ hideArgs $ bench_errRounded 0.1,
+  --benchGroup "twace"       $ applyTwoIdx twoIdxParams $ hideArgs bench_twacePow,
+  --benchGroup "embed"       $ applyTwoIdx twoIdxParams $ hideArgs bench_embedPow
   ]
 
 bench_unzipCycPow :: (UnzipCtx t m r) => Cyc t m (r,r) -> Bench '(t,m,r)
@@ -54,7 +85,7 @@ bench_mul a b =
 
 -- convert input from Pow basis to CRT basis
 bench_crt :: (BasicCtx t m r) => Cyc t m r -> Bench '(t,m,r)
-bench_crt x = let y = advisePow x in bench adviseCRT y
+bench_crt x = let y = advisePow x in bench (inline adviseCRT) y
 
 -- convert input from CRT basis to Pow basis
 bench_crtInv :: (BasicCtx t m r) => Cyc t m r -> Bench '(t,m,r)
@@ -95,7 +126,7 @@ bench_embedPow x =
   let y = advisePow x
   in bench (embed :: Cyc t m r -> Cyc t m' r) y
 
-type Tensors = '[CT,RT]
+type Tensors = '[CT]
 type MRCombos =
   '[ '(F1024, Zq 1051649),      -- 1024 / 512
      '(F2048, Zq 1054721),      -- 2048 / 1024
@@ -110,8 +141,13 @@ type MM'RCombos =
      '(F128, F128 * F91, Zq 23297)
     ]
 
+type QuickTest = '[ '(F9*F5*F7*F11, Zq 34651)
+                  {-'(F128, Zq 257),
+                    '(F32 * F9, Zq 577),
+                    '(F32 * F9, Int64)-} ]
+
 -- EAC: must be careful where we use Nub: apparently TypeRepStar doesn't work well with the Tensor constructors
-type AllParams = ( '(,) <$> Tensors) <*> MRCombos
+type AllParams = ( '(,) <$> Tensors) <*> QuickTest
 allParams :: Proxy AllParams
 allParams = Proxy
 
@@ -132,3 +168,4 @@ type instance Apply Liftable '(m',r) = Int64 :== (LiftOf r)
 
 data RemoveM :: TyFun (Factored, Factored, *) (Factored, *) -> *
 type instance Apply RemoveM '(m,m',r) = '(m',r)
+-}

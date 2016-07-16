@@ -247,7 +247,7 @@ instance Tensor CT where
 
   scalarPow = CT . scalarPow' -- Vector code
 
-  l = wrap $ untag $ basicDispatch dl
+  l = wrap $ withBasicArgs2 dl
   lInv = wrap $ untag $ basicDispatch dlinv
 
   mulGPow = wrap mulGPow'
@@ -356,6 +356,21 @@ withBasicArgs f =
       totm = proxy (fromIntegral <$> totientFact) (Proxy::Proxy m)
       numFacts = fromIntegral $ SV.length factors
   in \(CT' x) -> do
+    yout <- SV.thaw x
+    SM.unsafeWith yout (\pout ->
+      SV.unsafeWith factors (\pfac ->
+        f pout totm pfac numFacts))
+    CT' <$> unsafeFreeze yout
+
+{-# INLINABLE withBasicArgs2 #-}
+withBasicArgs2 :: forall m r . (Fact m, Storable r)
+  => (Ptr r -> Int64 -> Ptr CPP -> Int16 -> IO ())
+     -> CT' m r -> CT' m r
+withBasicArgs2 f =
+  let factors = proxy (marshalFactors <$> ppsFact) (Proxy::Proxy m)
+      totm = proxy (fromIntegral <$> totientFact) (Proxy::Proxy m)
+      numFacts = fromIntegral $ SV.length factors
+  in \(CT' x) -> unsafePerformIO $ do
     yout <- SV.thaw x
     SM.unsafeWith yout (\pout ->
       SV.unsafeWith factors (\pfac ->
